@@ -1,122 +1,98 @@
 
+"""
+Lesson management routes with authentication and role-based authorization
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime
+from typing import List
+
 from ...database import get_db
 from ... import crud, schemas, models
-from ...main import get_current_active_user
-from ...tasks import send_lesson_reminder
+from ...auth.dependencies import get_current_active_user, require_teacher_role
 
 router = APIRouter(
-    prefix="/api/v1/lessons",
+    prefix="/lessons",
     tags=["lessons"],
-    responses={404: {"description": "Not found"}},
+    dependencies=[Depends(get_current_active_user)]  # All routes require authentication
 )
 
 
-@router.post("/", response_model=schemas.Lesson, status_code=status.HTTP_201_CREATED)
-def create_lesson(
-    lesson: schemas.LessonCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    """Create a new lesson"""
-    # Verify that teacher exists and is actually a teacher
-    teacher = crud.get_user(db, user_id=lesson.teacher_id)
-    if not teacher or not teacher.is_teacher:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid teacher ID"
-        )
-    
-    # Verify that student exists
-    student = crud.get_user(db, user_id=lesson.student_id)
-    if not student:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid student ID"
-        )
-    
-    # Only teachers can create lessons for themselves or admins can create any lesson
-    if (current_user.id != lesson.teacher_id and 
-        not getattr(current_user, 'is_admin', False)):
-        raise HTTPException(
-            status_code=403,
-            detail="Not authorized to create lessons for this teacher"
-        )
-    
-    # Check for scheduling conflicts
-    existing_lessons = db.query(models.Lesson).filter(
-        models.Lesson.teacher_id == lesson.teacher_id,
-        models.Lesson.scheduled_at == lesson.scheduled_at,
-        models.Lesson.status == "scheduled"
-    ).first()
-    
-    if existing_lessons:
-        raise HTTPException(
-            status_code=400,
-            detail="Teacher already has a lesson scheduled at this time"
-        )
-    
-    db_lesson = crud.create_lesson(db=db, lesson=lesson)
-    
-    # Schedule reminder task
-    reminder_time = lesson.scheduled_at.timestamp() - 3600  # 1 hour before
-    send_lesson_reminder.apply_async(args=[db_lesson.id], eta=datetime.fromtimestamp(reminder_time))
-    
-    return db_lesson
-
-
 @router.get("/", response_model=List[schemas.Lesson])
-def read_lessons(
+async def read_lessons(
     skip: int = 0,
     limit: int = 100,
-    teacher_id: Optional[int] = None,
-    student_id: Optional[int] = None,
-    status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(require_teacher_role)  # Only teachers can see all lessons
 ):
-    """Get list of lessons with optional filters"""
-    query = db.query(models.Lesson)
+    """
+    Retrieve all lessons (teacher only)
     
-    # Apply filters
-    if teacher_id:
-        query = query.filter(models.Lesson.teacher_id == teacher_id)
-    if student_id:
-        query = query.filter(models.Lesson.student_id == student_id)
-    if status:
-        query = query.filter(models.Lesson.status == status)
-    
-    # Users can only see lessons they're involved in unless they're admin
-    if not getattr(current_user, 'is_admin', False):
-        query = query.filter(
-            (models.Lesson.teacher_id == current_user.id) |
-            (models.Lesson.student_id == current_user.id)
-        )
-    
-    lessons = query.offset(skip).limit(limit).all()
+    Only teachers can access the list of all lessons.
+    """
+    lessons = crud.get_lessons(db, skip=skip, limit=limit)
     return lessons
 
 
+@router.post("/", response_model=schemas.Lesson)
+async def create_lesson(
+    lesson: schemas.LessonCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_teacher_role)  # Only teachers can create lessons
+):
+    """
+    Create new lesson (teacher only)
+    
+    Only teachers can create lessons. The teacher_id in the lesson must match the current user's ID.
+    """
+    # Ensure teacher can only create lessons for themselves
+    if lesson.teacher_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot create lessons for other teachers"
+        )
+    
+    # Verify student exists
+    student = crud.get_user(db, user_id=lesson.student_id)
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student not found"
+        )
+    
+    # Verify student is not a teacher
+    if student.is_teacher:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot create lesson with another teacher as student"
+        )
+    
+    return crud.create_lesson(db=db, lesson=lesson)
+
+
 @router.get("/{lesson_id}", response_model=schemas.Lesson)
-def read_lesson(
+async def read_lesson(
     lesson_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Get lesson by ID"""
+    """
+    Get lesson by ID
+    
+    Users can only see lessons where they are either the teacher or student.
+    """
     db_lesson = crud.get_lesson(db, lesson_id=lesson_id)
     if db_lesson is None:
-        raise HTTPException(status_code=404, detail="Lesson not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
     
-    # Users can only view lessons they're involved in unless they're admin
-    if (not getattr(current_user, 'is_admin', False) and
-        current_user.id != db_lesson.teacher_id and
+    # Check if user is involved in this lesson
+    if (current_user.id != db_lesson.teacher_id and 
         current_user.id != db_lesson.student_id):
         raise HTTPException(
-            status_code=403,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this lesson"
         )
     
@@ -124,123 +100,137 @@ def read_lesson(
 
 
 @router.put("/{lesson_id}", response_model=schemas.Lesson)
-def update_lesson(
+async def update_lesson(
     lesson_id: int,
     lesson_update: schemas.LessonUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Update lesson information"""
+    """
+    Update lesson
+    
+    Only the teacher of the lesson can update it.
+    Students can only update the notes field.
+    """
     db_lesson = crud.get_lesson(db, lesson_id=lesson_id)
     if db_lesson is None:
-        raise HTTPException(status_code=404, detail="Lesson not found")
-    
-    # Only teachers can update their lessons or admins can update any lesson
-    if (not getattr(current_user, 'is_admin', False) and
-        current_user.id != db_lesson.teacher_id):
         raise HTTPException(
-            status_code=403,
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
+    
+    # Check if user is involved in this lesson
+    if (current_user.id != db_lesson.teacher_id and 
+        current_user.id != db_lesson.student_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this lesson"
         )
     
-    updated_lesson = crud.update_lesson(db, lesson_id=lesson_id, lesson_update=lesson_update)
-    return updated_lesson
+    # If user is student, they can only update notes
+    if current_user.id == db_lesson.student_id and not current_user.is_teacher:
+        # Extract only the notes field for students
+        allowed_fields = {"notes"}
+        update_dict = lesson_update.model_dump(exclude_unset=True)
+        forbidden_fields = set(update_dict.keys()) - allowed_fields
+        
+        if forbidden_fields:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Students can only update notes field. Forbidden fields: {forbidden_fields}"
+            )
+    
+    return crud.update_lesson(db, lesson_id=lesson_id, lesson_update=lesson_update)
 
 
 @router.delete("/{lesson_id}")
-def delete_lesson(
+async def delete_lesson(
     lesson_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Delete (cancel) lesson"""
+    """
+    Delete lesson
+    
+    Only the teacher of the lesson can delete it.
+    """
     db_lesson = crud.get_lesson(db, lesson_id=lesson_id)
     if db_lesson is None:
-        raise HTTPException(status_code=404, detail="Lesson not found")
-    
-    # Only teachers can cancel their lessons or admins can cancel any lesson
-    if (not getattr(current_user, 'is_admin', False) and
-        current_user.id != db_lesson.teacher_id):
         raise HTTPException(
-            status_code=403,
-            detail="Not authorized to cancel this lesson"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
         )
     
-    # Soft delete by marking as cancelled
-    lesson_update = schemas.LessonUpdate(status="cancelled")
-    crud.update_lesson(db, lesson_id=lesson_id, lesson_update=lesson_update)
-    
-    return {"message": "Lesson cancelled successfully"}
-
-
-@router.get("/upcoming/me", response_model=List[schemas.Lesson])
-def get_my_upcoming_lessons(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    """Get upcoming lessons for current user"""
-    lessons = crud.get_upcoming_lessons(db, user_id=current_user.id, is_teacher=current_user.is_teacher)
-    return lessons
-
-
-@router.post("/{lesson_id}/complete")
-def mark_lesson_complete(
-    lesson_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    """Mark lesson as completed"""
-    db_lesson = crud.get_lesson(db, lesson_id=lesson_id)
-    if db_lesson is None:
-        raise HTTPException(status_code=404, detail="Lesson not found")
-    
-    # Only teachers can mark lessons as complete
+    # Only the teacher can delete the lesson
     if current_user.id != db_lesson.teacher_id:
         raise HTTPException(
-            status_code=403,
-            detail="Only the teacher can mark lessons as complete"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the teacher can delete this lesson"
         )
     
-    lesson_update = schemas.LessonUpdate(status="completed")
-    updated_lesson = crud.update_lesson(db, lesson_id=lesson_id, lesson_update=lesson_update)
+    success = crud.delete_lesson(db, lesson_id=lesson_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lesson not found"
+        )
     
-    return {"message": "Lesson marked as completed", "lesson": updated_lesson}
+    return {"message": "Lesson deleted successfully"}
 
 
-@router.post("/{lesson_id}/reschedule")
-def reschedule_lesson(
-    lesson_id: int,
-    new_datetime: datetime,
+@router.get("/teacher/{teacher_id}", response_model=List[schemas.Lesson])
+async def read_teacher_lessons(
+    teacher_id: int,
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Reschedule a lesson"""
-    db_lesson = crud.get_lesson(db, lesson_id=lesson_id)
-    if db_lesson is None:
-        raise HTTPException(status_code=404, detail="Lesson not found")
+    """
+    Get lessons for a specific teacher
     
-    # Only teachers can reschedule lessons
-    if current_user.id != db_lesson.teacher_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Only the teacher can reschedule lessons"
-        )
+    Teachers can see their own lessons. Students can see lessons from their teachers.
+    """
+    # Teachers can see their own lessons
+    if current_user.is_teacher and current_user.id == teacher_id:
+        return crud.get_lessons_by_teacher(db, teacher_id=teacher_id, skip=skip, limit=limit)
     
-    # Check for scheduling conflicts
-    existing_lessons = db.query(models.Lesson).filter(
-        models.Lesson.teacher_id == db_lesson.teacher_id,
-        models.Lesson.scheduled_at == new_datetime,
-        models.Lesson.status == "scheduled",
-        models.Lesson.id != lesson_id
-    ).first()
+    # Students can see lessons from any teacher (but only their own lessons will be returned)
+    if not current_user.is_teacher:
+        lessons = crud.get_lessons_by_teacher(db, teacher_id=teacher_id, skip=skip, limit=limit)
+        # Filter to only return lessons where current user is the student
+        return [lesson for lesson in lessons if lesson.student_id == current_user.id]
     
-    if existing_lessons:
-        raise HTTPException(
-            status_code=400,
-            detail="Teacher already has a lesson scheduled at this time"
-        )
+    # Other teachers cannot see lessons from other teachers
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not authorized to view lessons from this teacher"
+    )
+
+
+@router.get("/student/{student_id}", response_model=List[schemas.Lesson])
+async def read_student_lessons(
+    student_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    """
+    Get lessons for a specific student
     
-    lesson_update = schemas.LessonUpdate(scheduled_at=new_datetime)
-    updated_lesson = crud.update_lesson(db, lesson_id=lesson_id, lesson_update=lesson_update)
+    Students can see their own lessons. Teachers can see lessons for any student.
+    """
+    # Students can see their own lessons
+    if not current_user.is_teacher and current_user.id == student_id:
+        return crud.get_lessons_by_student(db, student_id=student_id, skip=skip, limit=limit)
     
-    return {"message": "Lesson rescheduled successfully", "lesson": updated_lesson}
+    # Teachers can see lessons for any student
+    if current_user.is_teacher:
+        return crud.get_lessons_by_student(db, student_id=student_id, skip=skip, limit=limit)
+    
+    # Students cannot see other students' lessons
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not authorized to view lessons from this student"
+    )

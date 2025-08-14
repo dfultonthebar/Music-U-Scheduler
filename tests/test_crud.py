@@ -8,6 +8,7 @@ import pytest
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+import time
 
 # Add the parent directory to the path so we can import from app
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -31,9 +32,10 @@ def db_session():
 
 def test_create_user(db_session):
     """Test creating a new user"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
     user_data = {
-        "email": "test@example.com",
-        "username": "testuser",
+        "email": f"test{unique_id}@example.com",
+        "username": f"testuser{unique_id}",
         "full_name": "Test User",
         "hashed_password": hash_password("testpass"),
         "is_active": True,
@@ -47,17 +49,21 @@ def test_create_user(db_session):
     db_session.refresh(user)
     
     assert user.id is not None
-    assert user.email == "test@example.com"
-    assert user.username == "testuser"
+    assert user.email == f"test{unique_id}@example.com"
+    assert user.username == f"testuser{unique_id}"
     assert user.is_active is True
     assert user.created_at is not None
 
 def test_read_user(db_session):
     """Test reading/querying users"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
+    unique_email = f"read{unique_id}@example.com"
+    unique_username = f"readuser{unique_id}"
+    
     # Create a test user first
     user = User(
-        email="read@example.com",
-        username="readuser",
+        email=unique_email,
+        username=unique_username,
         full_name="Read User",
         hashed_password=hash_password("readpass"),
         is_active=True,
@@ -70,20 +76,24 @@ def test_read_user(db_session):
     # Test reading by ID
     found_user = db_session.query(User).filter(User.id == user.id).first()
     assert found_user is not None
-    assert found_user.email == "read@example.com"
+    assert found_user.email == unique_email
     assert found_user.is_teacher is True
     
     # Test reading by email
-    found_user_by_email = db_session.query(User).filter(User.email == "read@example.com").first()
+    found_user_by_email = db_session.query(User).filter(User.email == unique_email).first()
     assert found_user_by_email is not None
     assert found_user_by_email.id == user.id
 
 def test_update_user(db_session):
     """Test updating user information"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
+    unique_email = f"update{unique_id}@example.com"
+    unique_username = f"updateuser{unique_id}"
+    
     # Create a test user
     user = User(
-        email="update@example.com",
-        username="updateuser",
+        email=unique_email,
+        username=unique_username,
         full_name="Update User",
         hashed_password=hash_password("updatepass"),
         is_active=True,
@@ -107,10 +117,14 @@ def test_update_user(db_session):
 
 def test_delete_user(db_session):
     """Test deleting a user"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
+    unique_email = f"delete{unique_id}@example.com"
+    unique_username = f"deleteuser{unique_id}"
+    
     # Create a test user
     user = User(
-        email="delete@example.com",
-        username="deleteuser",
+        email=unique_email,
+        username=unique_username,
         full_name="Delete User",
         hashed_password=hash_password("deletepass"),
         is_active=True,
@@ -131,10 +145,12 @@ def test_delete_user(db_session):
 
 def test_create_lesson(db_session):
     """Test creating a new lesson"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
+    
     # Create teacher and student first
     teacher = User(
-        email="teacher@example.com",
-        username="teacher",
+        email=f"teacher{unique_id}@example.com",
+        username=f"teacher{unique_id}",
         full_name="Test Teacher",
         hashed_password=hash_password("teacherpass"),
         is_active=True,
@@ -142,8 +158,8 @@ def test_create_lesson(db_session):
     )
     
     student = User(
-        email="student@example.com",
-        username="student",
+        email=f"student{unique_id}@example.com",
+        username=f"student{unique_id}",
         full_name="Test Student",
         hashed_password=hash_password("studentpass"),
         is_active=True,
@@ -182,10 +198,12 @@ def test_create_lesson(db_session):
 
 def test_read_lesson_with_relationships(db_session):
     """Test reading lessons and their relationships"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
+    
     # Create teacher and student
     teacher = User(
-        email="relteacher@example.com",
-        username="relteacher",
+        email=f"relteacher{unique_id}@example.com",
+        username=f"relteacher{unique_id}",
         full_name="Relationship Teacher",
         hashed_password=hash_password("relpass"),
         is_active=True,
@@ -193,8 +211,8 @@ def test_read_lesson_with_relationships(db_session):
     )
     
     student = User(
-        email="relstudent@example.com",
-        username="relstudent",
+        email=f"relstudent{unique_id}@example.com",
+        username=f"relstudent{unique_id}",
         full_name="Relationship Student",
         hashed_password=hash_password("relpass"),
         is_active=True,
@@ -230,10 +248,12 @@ def test_read_lesson_with_relationships(db_session):
 
 def test_update_lesson(db_session):
     """Test updating lesson information"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
+    
     # Create necessary users and lesson
     teacher = User(
-        email="upteacher@example.com",
-        username="upteacher",
+        email=f"upteacher{unique_id}@example.com",
+        username=f"upteacher{unique_id}",
         full_name="Update Teacher",
         hashed_password=hash_password("uppass"),
         is_active=True,
@@ -241,8 +261,8 @@ def test_update_lesson(db_session):
     )
     
     student = User(
-        email="upstudent@example.com",
-        username="upstudent",
+        email=f"upstudent{unique_id}@example.com",
+        username=f"upstudent{unique_id}",
         full_name="Update Student",
         hashed_password=hash_password("uppass"),
         is_active=True,
@@ -286,10 +306,12 @@ def test_update_lesson(db_session):
 
 def test_delete_lesson(db_session):
     """Test deleting a lesson"""
+    unique_id = str(int(time.time() * 1000))  # Use timestamp for unique emails
+    
     # Create necessary users and lesson
     teacher = User(
-        email="delteacher@example.com",
-        username="delteacher",
+        email=f"delteacher{unique_id}@example.com",
+        username=f"delteacher{unique_id}",
         full_name="Delete Teacher",
         hashed_password=hash_password("delpass"),
         is_active=True,
@@ -297,8 +319,8 @@ def test_delete_lesson(db_session):
     )
     
     student = User(
-        email="delstudent@example.com",
-        username="delstudent",
+        email=f"delstudent{unique_id}@example.com",
+        username=f"delstudent{unique_id}",
         full_name="Delete Student",
         hashed_password=hash_password("delpass"),
         is_active=True,

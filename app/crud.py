@@ -4,19 +4,7 @@ from sqlalchemy import and_, or_
 from typing import Optional, List
 from datetime import datetime
 from . import models, schemas
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a password"""
-    return pwd_context.hash(password)
+from .auth.utils import get_password_hash, verify_password
 
 
 # User CRUD operations
@@ -62,6 +50,11 @@ def update_user(db: Session, user_id: int, user_update: schemas.UserUpdate) -> O
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user:
         update_data = user_update.model_dump(exclude_unset=True)
+        
+        # Hash password if it's being updated
+        if 'password' in update_data:
+            update_data['hashed_password'] = get_password_hash(update_data.pop('password'))
+        
         for field, value in update_data.items():
             setattr(db_user, field, value)
         db.commit()
@@ -145,3 +138,8 @@ def get_upcoming_lessons(db: Session, user_id: int, is_teacher: bool = False) ->
         query = query.filter(models.Lesson.student_id == user_id)
     
     return query.order_by(models.Lesson.scheduled_at).all()
+
+
+# Authentication helper functions (kept for backward compatibility)
+# Note: These are just aliases to the functions in auth.utils for backward compatibility
+# They are already imported at the top of this file from auth.utils

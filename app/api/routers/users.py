@@ -1,156 +1,159 @@
 
+"""
+User management routes with authentication and role-based authorization
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+
 from ...database import get_db
 from ... import crud, schemas, models
-from ...main import get_current_active_user
-from ...tasks import send_welcome_email
+from ...auth.dependencies import get_current_active_user, require_teacher_role
 
 router = APIRouter(
-    prefix="/api/v1/users",
+    prefix="/users",
     tags=["users"],
-    responses={404: {"description": "Not found"}},
+    dependencies=[Depends(get_current_active_user)]  # All routes require authentication
 )
 
 
-@router.post("/", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    """Create a new user"""
-    # Check if user already exists
-    if crud.get_user_by_email(db, email=user.email):
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
-    if crud.get_user_by_username(db, username=user.username):
-        raise HTTPException(
-            status_code=400,
-            detail="Username already taken"
-        )
-    
-    db_user = crud.create_user(db=db, user=user)
-    
-    # Send welcome email asynchronously
-    send_welcome_email.delay(db_user.id)
-    
-    return db_user
-
-
 @router.get("/", response_model=List[schemas.User])
-def read_users(
+async def read_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(require_teacher_role)  # Only teachers can list all users
 ):
-    """Get list of users (requires authentication)"""
+    """
+    Retrieve users (teacher only)
+    
+    Only teachers can access the list of all users.
+    """
     users = crud.get_users(db, skip=skip, limit=limit)
     return users
 
 
-@router.get("/me", response_model=schemas.User)
-def read_user_me(current_user: models.User = Depends(get_current_active_user)):
-    """Get current user information"""
-    return current_user
-
-
 @router.get("/{user_id}", response_model=schemas.User)
-def read_user(
+async def read_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Get user by ID"""
+    """
+    Get user by ID
+    
+    Users can only see their own profile unless they are a teacher.
+    """
+    # Check if user is trying to access their own profile or if they're a teacher
+    if current_user.id != user_id and not current_user.is_teacher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this user"
+        )
+    
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
     return db_user
 
 
 @router.put("/{user_id}", response_model=schemas.User)
-def update_user(
+async def update_user(
     user_id: int,
     user_update: schemas.UserUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Update user information"""
-    # Users can only update their own information unless they're admin
-    if current_user.id != user_id and not getattr(current_user, 'is_admin', False):
+    """
+    Update user information
+    
+    Users can only update their own profile unless they are a teacher.
+    Teachers can update any user's profile.
+    """
+    # Check if user is trying to update their own profile or if they're a teacher
+    if current_user.id != user_id and not current_user.is_teacher:
         raise HTTPException(
-            status_code=403,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this user"
+        )
+    
+    # If a non-teacher is trying to change their teacher status, deny it
+    if current_user.id == user_id and not current_user.is_teacher and user_update.is_teacher is True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot promote yourself to teacher role"
         )
     
     db_user = crud.update_user(db, user_id=user_id, user_update=user_update)
     if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
     return db_user
 
 
 @router.delete("/{user_id}")
-def delete_user(
+async def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(require_teacher_role)  # Only teachers can delete users
 ):
-    """Delete user (soft delete - deactivate)"""
-    # Users can only delete their own account unless they're admin
-    if current_user.id != user_id and not getattr(current_user, 'is_admin', False):
+    """
+    Delete user (teacher only)
+    
+    Only teachers can delete users. Teachers cannot delete themselves.
+    """
+    if current_user.id == user_id:
         raise HTTPException(
-            status_code=403,
-            detail="Not authorized to delete this user"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete yourself"
         )
     
-    # Soft delete by deactivating user
-    user_update = schemas.UserUpdate(is_active=False)
-    db_user = crud.update_user(db, user_id=user_id, user_update=user_update)
-    
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"message": "User deactivated successfully"}
+    success = crud.delete_user(db, user_id=user_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return {"message": "User deleted successfully"}
 
 
-@router.get("/teachers/", response_model=List[schemas.User])
-def get_teachers(
-    skip: int = 0,
-    limit: int = 100,
+@router.get("/me/lessons", response_model=List[schemas.Lesson])
+async def read_my_lessons(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user)
 ):
-    """Get list of teachers"""
-    teachers = db.query(models.User).filter(
-        models.User.is_teacher == True,
-        models.User.is_active == True
-    ).offset(skip).limit(limit).all()
-    return teachers
-
-
-@router.get("/{user_id}/lessons", response_model=List[schemas.Lesson])
-def get_user_lessons(
-    user_id: int,
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
-):
-    """Get lessons for a specific user"""
-    # Users can only view their own lessons unless they're admin
-    if current_user.id != user_id and not getattr(current_user, 'is_admin', False):
-        raise HTTPException(
-            status_code=403,
-            detail="Not authorized to view this user's lessons"
-        )
+    """
+    Get current user's lessons
     
-    db_user = crud.get_user(db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if db_user.is_teacher:
-        lessons = crud.get_lessons_by_teacher(db, teacher_id=user_id, skip=skip, limit=limit)
+    Returns lessons where the current user is either teacher or student.
+    """
+    if current_user.is_teacher:
+        lessons = crud.get_lessons_by_teacher(db, teacher_id=current_user.id)
     else:
-        lessons = crud.get_lessons_by_student(db, student_id=user_id, skip=skip, limit=limit)
+        lessons = crud.get_lessons_by_student(db, student_id=current_user.id)
     
+    return lessons
+
+
+@router.get("/me/upcoming-lessons", response_model=List[schemas.Lesson])
+async def read_my_upcoming_lessons(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    """
+    Get current user's upcoming lessons
+    
+    Returns upcoming lessons where the current user is either teacher or student.
+    """
+    lessons = crud.get_upcoming_lessons(
+        db, 
+        user_id=current_user.id, 
+        is_teacher=current_user.is_teacher
+    )
     return lessons
