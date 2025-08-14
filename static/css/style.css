@@ -1,0 +1,166 @@
+
+/* Custom styles for Music U Scheduler */
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    padding: 48px 0 0;
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+}
+
+.sidebar-sticky {
+    position: relative;
+    top: 0;
+    height: calc(100vh - 48px);
+    padding-top: .5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.sidebar .nav-link {
+    font-weight: 500;
+    color: #333;
+}
+
+.sidebar .nav-link.active {
+    color: #007bff;
+    background-color: rgba(0, 123, 255, .1);
+}
+
+.sidebar .nav-link:hover {
+    color: #007bff;
+}
+
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
+}
+
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+
+.border-left-warning {
+    border-left: 0.25rem solid #f6c23e !important;
+}
+
+.text-xs {
+    font-size: 0.7rem;
+}
+
+.font-weight-bold {
+    font-weight: 700 !important;
+}
+
+.text-gray-300 {
+    color: #dddfeb !important;
+}
+
+.text-gray-800 {
+    color: #5a5c69 !important;
+}
+
+.card {
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
+    border: 1px solid #e3e6f0;
+}
+
+.card-header {
+    background-color: #f8f9fc;
+    border-bottom: 1px solid #e3e6f0;
+}
+
+/* Dashboard specific styles */
+.dashboard-card {
+    transition: transform 0.2s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Table styles */
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #5a5c69;
+}
+
+/* Button styles */
+.btn-group .btn {
+    margin-right: 0;
+}
+
+/* Badge styles */
+.badge {
+    font-size: 0.75em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 767.98px) {
+    .sidebar {
+        top: 5rem;
+    }
+}
+
+/* Loading spinner */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Form styles */
+.form-control:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+/* Alert styles */
+.alert {
+    border: none;
+    border-radius: 0.35rem;
+}
+
+/* Calendar styles */
+.calendar-day {
+    min-height: 100px;
+    border: 1px solid #e3e6f0;
+    padding: 0.5rem;
+}
+
+.calendar-day.today {
+    background-color: rgba(78, 115, 223, 0.1);
+}
+
+.lesson-item {
+    background-color: #4e73df;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+}
+
+.lesson-item:hover {
+    background-color: #2e59d9;
+}
+
+/* Status indicators */
+.status-active {
+    color: #1cc88a;
+}
+
+.status-inactive {
+    color: #e74a3b;
+}
+
+.status-pending {
+    color: #f6c23e;
+}

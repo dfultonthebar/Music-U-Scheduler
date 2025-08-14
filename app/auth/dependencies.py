@@ -1,4 +1,5 @@
 
+
 """
 Authentication dependencies for FastAPI routes
 """
@@ -80,25 +81,94 @@ async def get_current_active_user(
     return current_user
 
 
-async def require_teacher_role(
+async def require_admin_role(
     current_user: models.User = Depends(get_current_active_user)
 ) -> models.User:
     """
-    Dependency to require teacher role
+    Dependency to require admin role
     
     Args:
         current_user: User from get_current_active_user dependency
         
     Returns:
-        User model instance (guaranteed to be a teacher)
+        User model instance (guaranteed to be an admin)
         
     Raises:
-        HTTPException: 403 if user is not a teacher
+        HTTPException: 403 if user is not an admin
     """
-    if not current_user.is_teacher:
+    if current_user.role != models.UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Teacher role required"
+            detail="Admin role required"
+        )
+    return current_user
+
+
+async def require_instructor_role(
+    current_user: models.User = Depends(get_current_active_user)
+) -> models.User:
+    """
+    Dependency to require instructor role
+    
+    Args:
+        current_user: User from get_current_active_user dependency
+        
+    Returns:
+        User model instance (guaranteed to be an instructor)
+        
+    Raises:
+        HTTPException: 403 if user is not an instructor
+    """
+    if current_user.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Instructor role required"
+        )
+    return current_user
+
+
+async def require_teacher_role(
+    current_user: models.User = Depends(get_current_active_user)
+) -> models.User:
+    """
+    Dependency to require teacher role (backward compatibility + instructor)
+    
+    Args:
+        current_user: User from get_current_active_user dependency
+        
+    Returns:
+        User model instance (guaranteed to be a teacher/instructor)
+        
+    Raises:
+        HTTPException: 403 if user is not a teacher/instructor
+    """
+    if not (current_user.is_teacher or current_user.role == models.UserRole.INSTRUCTOR):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Teacher/Instructor role required"
+        )
+    return current_user
+
+
+async def require_admin_or_instructor(
+    current_user: models.User = Depends(get_current_active_user)
+) -> models.User:
+    """
+    Dependency to require admin or instructor role
+    
+    Args:
+        current_user: User from get_current_active_user dependency
+        
+    Returns:
+        User model instance (guaranteed to be admin or instructor)
+        
+    Raises:
+        HTTPException: 403 if user is not admin or instructor
+    """
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.INSTRUCTOR]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or Instructor role required"
         )
     return current_user
 
@@ -107,7 +177,7 @@ async def require_student_role(
     current_user: models.User = Depends(get_current_active_user)
 ) -> models.User:
     """
-    Dependency to require student role (not a teacher)
+    Dependency to require student role (not a teacher/instructor/admin)
     
     Args:
         current_user: User from get_current_active_user dependency
@@ -116,9 +186,9 @@ async def require_student_role(
         User model instance (guaranteed to be a student)
         
     Raises:
-        HTTPException: 403 if user is a teacher (not a student)
+        HTTPException: 403 if user is not a student
     """
-    if current_user.is_teacher:
+    if current_user.role != models.UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Student role required"
@@ -157,3 +227,4 @@ async def get_optional_current_user(
         return user if user and user.is_active else None
     except Exception:
         return None
+

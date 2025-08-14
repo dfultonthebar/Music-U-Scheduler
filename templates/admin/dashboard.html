@@ -1,0 +1,145 @@
+
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Admin Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary">Export</button>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Users</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_users }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-users fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Lessons</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.total_lessons }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Active Instructors</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.active_instructors }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-chalkboard-teacher fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">This Month Revenue</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">${{ stats.monthly_revenue }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Lessons</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Instructor</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lesson in recent_lessons %}
+                            <tr>
+                                <td>{{ lesson.student.full_name }}</td>
+                                <td>{{ lesson.instructor.full_name }}</td>
+                                <td>{{ lesson.date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ lesson.time.strftime('%H:%M') }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if lesson.status == 'completed' else 'primary' if lesson.status == 'scheduled' else 'warning' }}">
+                                        {{ lesson.status.title() }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/admin/users/create" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Add New User
+                    </a>
+                    <a href="/admin/lessons/create" class="btn btn-success">
+                        <i class="fas fa-calendar-plus"></i> Schedule Lesson
+                    </a>
+                    <a href="/admin/reports" class="btn btn-info">
+                        <i class="fas fa-chart-bar"></i> View Reports
+                    </a>
+                    <a href="/admin/settings" class="btn btn-secondary">
+                        <i class="fas fa-cog"></i> System Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
