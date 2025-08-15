@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/home/ubuntu/Music-U-Scheduler/music-u-env"
+VIRTUAL_ENV="/home/ubuntu/music-u-scheduler-frontend/music-u-env"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

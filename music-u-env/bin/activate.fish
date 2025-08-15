@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/home/ubuntu/Music-U-Scheduler/music-u-env"
+set -gx VIRTUAL_ENV "/home/ubuntu/music-u-scheduler-frontend/music-u-env"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
