@@ -380,6 +380,138 @@ class APIService {
           name: 'Voice Coach',
           description: 'Vocal training specialist',
           permissions: ['teach_vocals', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-4',
+          name: 'Violin Instructor',
+          description: 'Classical and contemporary violin teacher',
+          permissions: ['teach_violin', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-5',
+          name: 'Trumpet Instructor',
+          description: 'Brass instrument specialist - trumpet',
+          permissions: ['teach_trumpet', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-6',
+          name: 'Clarinet Instructor',
+          description: 'Woodwind instrument teacher - clarinet',
+          permissions: ['teach_clarinet', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-7',
+          name: 'Saxophone Instructor',
+          description: 'Professional saxophone teacher',
+          permissions: ['teach_saxophone', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-8',
+          name: 'Flute Instructor',
+          description: 'Woodwind specialist - flute',
+          permissions: ['teach_flute', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-9',
+          name: 'Drums Instructor',
+          description: 'Percussion and drum kit teacher',
+          permissions: ['teach_drums', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-10',
+          name: 'Cello Instructor',
+          description: 'String instrument teacher - cello',
+          permissions: ['teach_cello', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-11',
+          name: 'Trombone Instructor',
+          description: 'Brass instrument specialist - trombone',
+          permissions: ['teach_trombone', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-12',
+          name: 'French Horn Instructor',
+          description: 'Advanced brass instrument teacher',
+          permissions: ['teach_french_horn', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-13',
+          name: 'Oboe Instructor',
+          description: 'Double reed woodwind specialist',
+          permissions: ['teach_oboe', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-14',
+          name: 'Bassoon Instructor',
+          description: 'Double reed woodwind teacher - bassoon',
+          permissions: ['teach_bassoon', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-15',
+          name: 'Viola Instructor',
+          description: 'String instrument teacher - viola',
+          permissions: ['teach_viola', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-16',
+          name: 'Double Bass Instructor',
+          description: 'String bass and upright bass teacher',
+          permissions: ['teach_double_bass', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-17',
+          name: 'Tuba Instructor',
+          description: 'Low brass instrument specialist',
+          permissions: ['teach_tuba', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-18',
+          name: 'Harp Instructor',
+          description: 'Classical and contemporary harp teacher',
+          permissions: ['teach_harp', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-19',
+          name: 'Percussion Instructor',
+          description: 'General percussion and mallet instruments',
+          permissions: ['teach_percussion', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-20',
+          name: 'Ukulele Instructor',
+          description: 'Four-string ukulele teacher',
+          permissions: ['teach_ukulele', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-21',
+          name: 'Bass Guitar Instructor',
+          description: 'Electric and acoustic bass guitar teacher',
+          permissions: ['teach_bass_guitar', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-22',
+          name: 'Banjo Instructor',
+          description: 'Traditional and bluegrass banjo teacher',
+          permissions: ['teach_banjo', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-23',
+          name: 'Mandolin Instructor',
+          description: 'String instrument teacher - mandolin',
+          permissions: ['teach_mandolin', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-24',
+          name: 'Accordion Instructor',
+          description: 'Traditional and modern accordion teacher',
+          permissions: ['teach_accordion', 'schedule_lessons', 'view_students']
+        },
+        {
+          id: 'role-25',
+          name: 'Harmonica Instructor',
+          description: 'Blues and folk harmonica specialist',
+          permissions: ['teach_harmonica', 'schedule_lessons', 'view_students']
         }
       ];
     }
