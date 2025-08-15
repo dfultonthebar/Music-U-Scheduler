@@ -19,10 +19,19 @@ import {
   Music,
   UserCheck,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  Mail,
+  Database,
+  GitBranch,
+  UserPlus,
+  GraduationCap
 } from 'lucide-react';
 import { DashboardStats, User, Lesson, AuditLog } from '@/lib/types';
 import { toast } from 'sonner';
+import UserManagement from './user-management';
+import EmailSettings from './email-settings';
+import SystemBackupManager from './system-backup';
+import GitHubUpdates from './github-updates';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -126,30 +135,42 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white rounded-lg shadow-sm">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-9 bg-white rounded-lg shadow-sm">
+            <TabsTrigger value="dashboard" className="flex items-center gap-2 text-xs lg:text-sm">
               <LayoutDashboard className="w-4 h-4" />
-              Dashboard
+              <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Users
+            <TabsTrigger value="user-management" className="flex items-center gap-2 text-xs lg:text-sm">
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Users</span>
             </TabsTrigger>
-            <TabsTrigger value="lessons" className="flex items-center gap-2">
+            <TabsTrigger value="lessons" className="flex items-center gap-2 text-xs lg:text-sm">
               <BookOpen className="w-4 h-4" />
-              Lessons
+              <span className="hidden sm:inline">Lessons</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
+            <TabsTrigger value="email-settings" className="flex items-center gap-2 text-xs lg:text-sm">
+              <Mail className="w-4 h-4" />
+              <span className="hidden sm:inline">Email</span>
+            </TabsTrigger>
+            <TabsTrigger value="backup" className="flex items-center gap-2 text-xs lg:text-sm">
+              <Database className="w-4 h-4" />
+              <span className="hidden sm:inline">Backup</span>
+            </TabsTrigger>
+            <TabsTrigger value="updates" className="flex items-center gap-2 text-xs lg:text-sm">
+              <GitBranch className="w-4 h-4" />
+              <span className="hidden sm:inline">Updates</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2 text-xs lg:text-sm">
               <Settings className="w-4 h-4" />
-              Settings
+              <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
-            <TabsTrigger value="audit-logs" className="flex items-center gap-2">
+            <TabsTrigger value="audit-logs" className="flex items-center gap-2 text-xs lg:text-sm">
               <FileText className="w-4 h-4" />
-              Audit Logs
+              <span className="hidden sm:inline">Logs</span>
             </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-2">
+            <TabsTrigger value="reports" className="flex items-center gap-2 text-xs lg:text-sm">
               <BarChart3 className="w-4 h-4" />
-              Reports
+              <span className="hidden sm:inline">Reports</span>
             </TabsTrigger>
           </TabsList>
 
@@ -246,47 +267,24 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
 
-          {/* Users Tab */}
-          <TabsContent value="users" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage all registered users in the system</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {users?.length > 0 ? (
-                    users.map((user, index) => (
-                      <div key={user?.id || index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
-                            {user?.first_name?.[0] || 'U'}{user?.last_name?.[0] || ''}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{user?.first_name || 'Unknown'} {user?.last_name || 'User'}</p>
-                            <p className="text-sm text-gray-500">{user?.email || 'No email'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={user?.role === 'admin' ? 'default' : user?.role === 'instructor' ? 'secondary' : 'outline'}>
-                            {user?.role || 'user'}
-                          </Badge>
-                          <Badge variant={user?.is_active ? 'default' : 'destructive'} className={user?.is_active ? 'bg-green-100 text-green-800' : ''}>
-                            {user?.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-12 text-gray-500">
-                      <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg font-medium">No users found</p>
-                      <p className="text-sm">Users will appear here once registered</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Enhanced User Management Tab */}
+          <TabsContent value="user-management" className="space-y-6">
+            <UserManagement />
+          </TabsContent>
+
+          {/* Email Settings Tab */}
+          <TabsContent value="email-settings" className="space-y-6">
+            <EmailSettings />
+          </TabsContent>
+
+          {/* System Backup Tab */}
+          <TabsContent value="backup" className="space-y-6">
+            <SystemBackupManager />
+          </TabsContent>
+
+          {/* GitHub Updates Tab */}
+          <TabsContent value="updates" className="space-y-6">
+            <GitHubUpdates />
           </TabsContent>
 
           {/* Lessons Tab */}
