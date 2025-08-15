@@ -272,15 +272,26 @@ setup_frontend_environment() {
     # Aggressive cleanup of any existing installation artifacts
     print_status "Performing deep cleanup of existing installation..."
     
-    # Force remove node_modules with sudo if needed
-    if [ -d "node_modules" ]; then
-        print_status "Forcefully removing existing node_modules..."
-        sudo rm -rf node_modules 2>/dev/null || rm -rf node_modules
-    fi
+    # Ultra-aggressive node_modules removal using multiple methods
+    print_status "Removing any existing node_modules directories..."
     
-    # Remove yarn.lock and package-lock.json to avoid conflicts
-    [ -f "yarn.lock" ] && rm -f yarn.lock
-    [ -f "package-lock.json" ] && rm -f package-lock.json
+    # Method 1: Standard removal
+    [ -d "node_modules" ] && rm -rf node_modules 2>/dev/null
+    
+    # Method 2: Sudo removal if standard fails
+    [ -d "node_modules" ] && sudo rm -rf node_modules 2>/dev/null
+    
+    # Method 3: Find and remove any hidden or stubborn node_modules
+    find . -name "node_modules" -type d -exec sudo rm -rf {} + 2>/dev/null || true
+    
+    # Method 4: Remove any .bin directories that might be lingering
+    find . -name ".bin" -type d -exec sudo rm -rf {} + 2>/dev/null || true
+    
+    # Remove all lock files to avoid conflicts
+    rm -f yarn.lock package-lock.json npm-shrinkwrap.json 2>/dev/null || true
+    
+    # Remove Next.js build artifacts
+    rm -rf .next .next.cache 2>/dev/null || true
     
     # Clean various caches
     if command_exists yarn; then
@@ -366,13 +377,68 @@ setup_frontend_environment() {
     
     # Build the frontend
     print_status "Building frontend for production..."
-    if yarn build 2>/dev/null; then
-        print_success "Frontend built successfully with Yarn"
-    elif npm run build 2>/dev/null; then
-        print_success "Frontend built successfully with NPM"
-    else
+    
+    # Clean any existing build artifacts first
+    rm -rf .next out dist build 2>/dev/null || true
+    
+    # Determine which package manager successfully installed dependencies
+    BUILD_SUCCESS=false
+    
+    if [ "$INSTALL_SUCCESS" = true ]; then
+        # Try building with yarn first (if yarn installation succeeded)
+        if command_exists yarn && yarn build 2>/tmp/yarn_build.log; then
+            BUILD_SUCCESS=true
+            print_success "Frontend built successfully with Yarn"
+        else
+            print_warning "Yarn build failed, trying NPM..."
+            if [ -f "/tmp/yarn_build.log" ]; then
+                print_status "Yarn build error details:"
+                cat /tmp/yarn_build.log | tail -10
+            fi
+        fi
+        
+        # Fallback to NPM if yarn build failed
+        if [ "$BUILD_SUCCESS" = false ] && command_exists npm; then
+            if npm run build 2>/tmp/npm_build.log; then
+                BUILD_SUCCESS=true
+                print_success "Frontend built successfully with NPM"
+            else
+                print_warning "NPM build also failed"
+                if [ -f "/tmp/npm_build.log" ]; then
+                    print_status "NPM build error details:"
+                    cat /tmp/npm_build.log | tail -10
+                fi
+            fi
+        fi
+    fi
+    
+    # If build still failed, try to fix common issues
+    if [ "$BUILD_SUCCESS" = false ]; then
+        print_status "Attempting to fix common build issues..."
+        
+        # Clear all caches
+        npm cache clean --force 2>/dev/null || true
+        yarn cache clean --force 2>/dev/null || true
+        
+        # Remove and reinstall dependencies with npm (most reliable)
+        rm -rf node_modules package-lock.json yarn.lock 2>/dev/null || true
+        
+        if npm install --legacy-peer-deps --no-audit --no-fund; then
+            print_status "Dependencies reinstalled, trying build again..."
+            if npm run build 2>/dev/null; then
+                BUILD_SUCCESS=true
+                print_success "Frontend built successfully after dependency fix"
+            fi
+        fi
+    fi
+    
+    if [ "$BUILD_SUCCESS" = false ]; then
         print_warning "Frontend build failed, but continuing with development mode"
-        print_warning "You can build manually later with: cd $INSTALL_DIR/frontend && npm run build"
+        print_warning "The application will still work in development mode"
+        print_warning "You can build manually later with:"
+        print_warning "  cd $INSTALL_DIR/frontend"
+        print_warning "  npm install --legacy-peer-deps"
+        print_warning "  npm run build"
     fi
     
     return 0
@@ -945,12 +1011,64 @@ post_install_setup() {
 setup_postgresql() {
     print_professional "Setting up PostgreSQL database..."
     
+    # Verify PostgreSQL is installed
+    if ! command_exists psql; then
+        print_status "PostgreSQL not found. Installing PostgreSQL..."
+        if command_exists apt-get; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql postgresql-contrib
+        elif command_exists yum; then
+            sudo yum install -y postgresql postgresql-server postgresql-contrib
+            sudo postgresql-setup initdb  # Initialize database for CentOS/RHEL
+        elif command_exists dnf; then
+            sudo dnf install -y postgresql postgresql-server postgresql-contrib
+            sudo postgresql-setup --initdb  # Initialize database for Fedora
+        else
+            print_error "Could not install PostgreSQL. Please install it manually."
+            return 1
+        fi
+        print_success "PostgreSQL installed"
+    fi
+    
+    # Initialize PostgreSQL if needed (for some distributions)
+    if [ -f "/usr/pgsql-*/bin/postgresql-*-setup" ]; then
+        sudo /usr/pgsql-*/bin/postgresql-*-setup initdb 2>/dev/null || true
+    fi
+    
     # Start and enable PostgreSQL
-    sudo systemctl start postgresql
-    sudo systemctl enable postgresql
+    print_status "Starting PostgreSQL service..."
+    if sudo systemctl start postgresql 2>/dev/null; then
+        print_success "PostgreSQL started successfully"
+    else
+        # Try alternative service names
+        if sudo systemctl start postgresql-14 2>/dev/null || sudo systemctl start postgresql-13 2>/dev/null || sudo systemctl start postgresql-12 2>/dev/null; then
+            print_success "PostgreSQL started with version-specific service"
+        else
+            print_error "Failed to start PostgreSQL service"
+            print_status "Checking available PostgreSQL services..."
+            systemctl list-units --type=service | grep -i postgres || true
+            return 1
+        fi
+    fi
+    
+    sudo systemctl enable postgresql 2>/dev/null || sudo systemctl enable postgresql-14 2>/dev/null || sudo systemctl enable postgresql-13 2>/dev/null || true
     
     # Wait for PostgreSQL to start
-    sleep 2
+    print_status "Waiting for PostgreSQL to initialize..."
+    sleep 5
+    
+    # Test PostgreSQL connection
+    if sudo -u postgres psql -c "SELECT version();" >/dev/null 2>&1; then
+        print_success "PostgreSQL is running and accessible"
+    else
+        print_error "PostgreSQL is not responding. Attempting to fix..."
+        sudo systemctl restart postgresql 2>/dev/null || true
+        sleep 3
+        if ! sudo -u postgres psql -c "SELECT version();" >/dev/null 2>&1; then
+            print_error "PostgreSQL connection failed. Please check manually."
+            return 1
+        fi
+    fi
     
     # Create database and user
     print_status "Creating database and user..."
@@ -958,6 +1076,13 @@ setup_postgresql() {
     sudo -u postgres psql -c "CREATE USER music_u_user WITH PASSWORD 'music_u_password';" 2>/dev/null || print_warning "User may already exist"
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE music_u_scheduler TO music_u_user;" 2>/dev/null
     sudo -u postgres psql -c "ALTER USER music_u_user CREATEDB;" 2>/dev/null
+    
+    # Test the new user connection
+    if PGPASSWORD=music_u_password psql -h localhost -U music_u_user -d music_u_scheduler -c "SELECT current_database();" >/dev/null 2>&1; then
+        print_success "Database user authentication working"
+    else
+        print_warning "Database user authentication test failed - may need manual configuration"
+    fi
     
     print_success "PostgreSQL database setup complete"
 }
