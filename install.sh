@@ -148,12 +148,12 @@ create_desktop_entry() {
         cp "$INSTALL_DIR/assets/icon.png" "$ICON_FILE"
     fi
     
-    # Create desktop file
+    # Create desktop file with correct path to app/main.py
     cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=Music-U-Scheduler
 Comment=Music practice scheduler and progress tracker
-Exec=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/main.py
+Exec=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/app/main.py
 Icon=$ICON_FILE
 Terminal=false
 Type=Application
@@ -187,7 +187,7 @@ cd "$SCRIPT_DIR"
 
 # Activate virtual environment and run the application
 source venv/bin/activate
-python main.py
+python app/main.py
 EOF
     
     chmod +x "$INSTALL_DIR/launch.sh"
@@ -200,9 +200,9 @@ post_install_setup() {
     
     cd "$INSTALL_DIR"
     
-    # Make main.py executable if it exists
-    if [ -f "main.py" ]; then
-        chmod +x main.py
+    # Make app/main.py executable if it exists
+    if [ -f "app/main.py" ]; then
+        chmod +x app/main.py
     fi
     
     # Create data directory if it doesn't exist
@@ -227,7 +227,7 @@ show_final_instructions() {
     echo "3. Manual activation:"
     echo "   cd $INSTALL_DIR"
     echo "   source venv/bin/activate"
-    echo "   python main.py"
+    echo "   python app/main.py"
     echo
     echo "For updates, simply run this installer again."
     echo
@@ -277,14 +277,28 @@ while [[ $# -gt 0 ]]; do
             # Auto-yes mode (useful for automated installations)
             shift
             ;;
+        --verify)
+            # Verification mode - just check if installation is working
+            INSTALL_DIR="$HOME/$APP_NAME"
+            if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/app/main.py" ]; then
+                print_success "Installation verified successfully!"
+                echo "Main application file found at: $INSTALL_DIR/app/main.py"
+                exit 0
+            else
+                print_error "Installation verification failed!"
+                echo "Expected main application file at: $INSTALL_DIR/app/main.py"
+                exit 1
+            fi
+            ;;
         -h|--help)
             echo "Music-U-Scheduler Enhanced Installer"
             echo
             echo "Usage: $0 [OPTIONS]"
             echo
             echo "Options:"
-            echo "  -y, --yes    Auto-confirm all prompts"
-            echo "  -h, --help   Show this help message"
+            echo "  -y, --yes      Auto-confirm all prompts"
+            echo "  --verify       Verify existing installation"
+            echo "  -h, --help     Show this help message"
             echo
             exit 0
             ;;

@@ -148,11 +148,12 @@ run_main_installer() {
 verify_installation() {
     INSTALL_DIR="$HOME/$APP_NAME"
     
-    if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/main.py" ]; then
+    if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/app/main.py" ]; then
         print_success "Installation verified successfully!"
         return 0
     else
         print_error "Installation verification failed!"
+        print_error "Expected main application file at: $INSTALL_DIR/app/main.py"
         return 1
     fi
 }
@@ -186,7 +187,7 @@ main() {
         echo "Or activate the virtual environment and run manually:"
         echo "  cd $HOME/$APP_NAME"
         echo "  source venv/bin/activate"
-        echo "  python main.py"
+        echo "  python app/main.py"
         echo
         print_success "Happy music practicing! 🎵"
     else
