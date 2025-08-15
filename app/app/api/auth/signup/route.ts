@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     
     // Since this is a frontend app that connects to the FastAPI backend,
     // we'll forward the signup request to the backend
-    const response = await fetch('https://musicu.local/auth/register', {
+    const response = await fetch('http://localhost:8001/auth/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

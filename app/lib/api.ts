@@ -1,7 +1,7 @@
 
 import { User, AuthResponse, LoginCredentials, RegisterData, Lesson, Student, Instructor, AuditLog, DashboardStats } from './types';
 
-const API_BASE_URL = 'https://musicu.local';
+const API_BASE_URL = 'http://localhost:8001';
 
 class APIError extends Error {
   constructor(public status: number, message: string) {

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       backendFormData.append('username', username);
       backendFormData.append('password', password);
 
-      const response = await fetch('https://musicu.local/auth/login', {
+      const response = await fetch('http://localhost:8001/auth/login', {
         method: 'POST',
         body: backendFormData,
       });
