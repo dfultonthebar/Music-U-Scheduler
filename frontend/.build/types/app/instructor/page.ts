@@ -1,4 +1,4 @@
-// File: /home/ubuntu/music-u-scheduler-frontend/app/app/instructor/page.tsx
+// File: /home/ubuntu/music-u-scheduler-frontend/frontend/app/instructor/page.tsx
 import * as entry from '../../../../app/instructor/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

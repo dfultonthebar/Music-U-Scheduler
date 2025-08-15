@@ -1,4 +1,4 @@
-// File: /home/ubuntu/music-u-scheduler-frontend/app/app/api/health/route.ts
+// File: /home/ubuntu/music-u-scheduler-frontend/frontend/app/api/health/route.ts
 import * as entry from '../../../../../app/api/health/route.js'
 import type { NextRequest } from 'next/server.js'
 

@@ -1,4 +1,4 @@
-// File: /home/ubuntu/music-u-scheduler-frontend/app/app/api/auth/csrf/route.ts
+// File: /home/ubuntu/music-u-scheduler-frontend/frontend/app/api/auth/csrf/route.ts
 import * as entry from '../../../../../../app/api/auth/csrf/route.js'
 import type { NextRequest } from 'next/server.js'
 
