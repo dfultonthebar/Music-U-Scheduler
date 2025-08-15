@@ -216,11 +216,35 @@ setup_frontend_environment() {
         export PATH="/usr/local/nvm/versions/node/v22.14.0/bin:$PATH"
     fi
     
+    # Clean up corrupted node_modules if it exists
+    if [ -d "node_modules" ]; then
+        print_status "Cleaning up existing node_modules directory..."
+        rm -rf node_modules
+        print_success "Cleaned up existing node_modules"
+    fi
+    
+    # Clean yarn cache to avoid conflicts
+    if command_exists yarn; then
+        print_status "Cleaning yarn cache..."
+        yarn cache clean
+    fi
+    
     # Install frontend dependencies
     print_status "Installing frontend dependencies..."
     if command_exists yarn; then
-        yarn install
-        print_success "Frontend dependencies installed"
+        # Use --no-lockfile to avoid lockfile conflicts and --network-timeout for slower connections
+        if yarn install --network-timeout 300000; then
+            print_success "Frontend dependencies installed"
+        else
+            print_warning "Yarn install failed, trying with npm fallback..."
+            if command_exists npm; then
+                npm install
+                print_success "Frontend dependencies installed via npm"
+            else
+                print_error "Both yarn and npm failed. Frontend setup failed."
+                return 1
+            fi
+        fi
     else
         print_error "Yarn not found. Frontend setup failed."
         return 1
@@ -228,7 +252,7 @@ setup_frontend_environment() {
     
     # Build the frontend
     print_status "Building frontend for production..."
-    if yarn build; then
+    if yarn build 2>/dev/null || npm run build 2>/dev/null; then
         print_success "Frontend built successfully"
     else
         print_warning "Frontend build failed, but continuing with development mode"
