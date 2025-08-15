@@ -3,7 +3,7 @@
 
 import './globals.css'
 import { Inter } from 'next/font/google'
-import { AuthProvider } from '@/contexts/auth-context'
+import { SessionProvider } from 'next-auth/react'
 import { Toaster } from 'sonner'
 import { useEffect } from 'react'
 
@@ -30,10 +30,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
+        <SessionProvider>
           {children}
           <Toaster />
-        </AuthProvider>
+        </SessionProvider>
       </body>
     </html>
   )

@@ -26,7 +26,8 @@ const mockUsers = [
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: "credentials",
+      id: "credentials",
+      name: "credentials", 
       credentials: {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" }
@@ -43,7 +44,8 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             name: user.name,
-            role: user.role
+            role: user.role,
+            username: user.username
           }
         }
 
@@ -52,16 +54,18 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: {
-    strategy: "jwt"
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: "/login",
     error: "/login"
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.role = (user as any).role
+        token.username = (user as any).username
       }
       return token
     },
@@ -69,9 +73,21 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         (session.user as any).role = token.role as string
         (session.user as any).id = token.sub as string
+        (session.user as any).username = token.username as string
       }
       return session
-    }
+    },
+    async signIn({ user, account, profile }) {
+      return true // Always allow sign in for now
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      // Allows callback URLs on the same origin
+      else if (new URL(url).origin === baseUrl) return url
+      return baseUrl
+    },
   },
-  secret: process.env.NEXTAUTH_SECRET
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: true, // Enable debug mode for troubleshooting
 }

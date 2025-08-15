@@ -3,12 +3,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Eye, EyeOff, Music, User, Lock } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
+import { toast } from 'sonner';
 
 export default function LoginForm() {
   const [credentials, setCredentials] = useState({
@@ -17,22 +18,40 @@ export default function LoginForm() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { login, loading: authLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     
     try {
-      const success = await login(credentials);
-      if (!success) {
+      const result = await signIn('credentials', {
+        username: credentials.username,
+        password: credentials.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
         setError('Invalid username or password');
+        toast.error('Login failed');
+      } else if (result?.ok) {
+        toast.success('Login successful!');
+        
+        // Redirect based on role - for now, redirect admin to /admin
+        if (credentials.username === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
       }
-      // Note: Redirect is handled by the auth context
     } catch (error) {
       console.error('Login error:', error);
       setError('Login failed. Please try again.');
+      toast.error('Login failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -82,7 +101,7 @@ export default function LoginForm() {
                     onChange={handleChange}
                     className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="Enter your username"
-                    disabled={authLoading}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -102,13 +121,13 @@ export default function LoginForm() {
                     onChange={handleChange}
                     className="pl-10 pr-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="Enter your password"
-                    disabled={authLoading}
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                    disabled={authLoading}
+                    disabled={isLoading}
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -122,9 +141,9 @@ export default function LoginForm() {
               <Button 
                 type="submit" 
                 className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
-                disabled={authLoading}
+                disabled={isLoading}
               >
-                {authLoading ? (
+                {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Signing in...
@@ -136,12 +155,7 @@ export default function LoginForm() {
             </form>
           </CardContent>
           
-          <CardFooter className="text-center space-y-2">
-            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded-md">
-              <p className="font-semibold">Default Admin Login:</p>
-              <p className="font-mono">Username: admin</p>
-              <p className="font-mono">Password: MusicU2025</p>
-            </div>
+          <CardFooter className="text-center">
             <p className="text-sm text-gray-500">
               Music-U-Scheduler • Lesson Management System
             </p>
