@@ -186,9 +186,10 @@ generate_ssl_certificates() {
     
     # Generate self-signed certificate
     print_status "Generating self-signed certificate..."
-    sudo openssl x509 -req -days 365 -in "$SSL_DIR/cert.csr" \
-        -signkey "$SSL_DIR/private.key" -out "$SSL_DIR/cert.crt" \
-        -extensions v3_req -extfile <(cat <<EOF
+    
+    # Create temporary config file for certificate extensions
+    TEMP_CONFIG=$(mktemp)
+    cat > "$TEMP_CONFIG" <<EOF
 [v3_req]
 keyUsage = keyEncipherment, dataEncipherment
 extendedKeyUsage = serverAuth
@@ -199,7 +200,13 @@ DNS.2 = www.$DOMAIN
 DNS.3 = localhost
 IP.1 = 127.0.0.1
 EOF
-)
+    
+    sudo openssl x509 -req -days 365 -in "$SSL_DIR/cert.csr" \
+        -signkey "$SSL_DIR/private.key" -out "$SSL_DIR/cert.crt" \
+        -extensions v3_req -extfile "$TEMP_CONFIG"
+    
+    # Clean up temporary file
+    rm -f "$TEMP_CONFIG"
     
     # Set proper permissions
     sudo chmod 600 "$SSL_DIR/private.key"
@@ -367,12 +374,10 @@ EOF
 create_update_mechanism() {
     print_professional "Setting up automatic update mechanism"
     
-    # Create scripts directory
-    mkdir -p "$INSTALL_DIR/scripts"
-    
     # Create update script
     cat > "$INSTALL_DIR/scripts/update.sh" <<'EOF'
 #!/bin/bash
+
 # Music-U-Scheduler Auto-Update Script
 set -e
 
