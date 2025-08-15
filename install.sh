@@ -278,6 +278,26 @@ setup_frontend_environment() {
     export PATH="/usr/local/bin:/usr/bin:$PATH"
     hash -r
     
+    # Configure Yarn Berry for user-space operation (fix permission issues)
+    if command_exists yarn && yarn --version | grep -q "^[4-9]"; then
+        print_status "Configuring Yarn Berry for user-space operation..."
+        
+        # Set yarn cache directory to user-writable location
+        export YARN_CACHE_FOLDER="$HOME/.cache/yarn"
+        export YARN_GLOBAL_FOLDER="$HOME/.config/yarn/global"
+        export YARN_ENABLE_TELEMETRY=false
+        
+        # Create directories if they don't exist
+        mkdir -p "$YARN_CACHE_FOLDER" "$YARN_GLOBAL_FOLDER" 2>/dev/null || true
+        
+        # Configure yarn for this project
+        yarn config set cacheFolder "$YARN_CACHE_FOLDER" 2>/dev/null || true
+        yarn config set globalFolder "$YARN_GLOBAL_FOLDER" 2>/dev/null || true
+        yarn config set enableTelemetry false 2>/dev/null || true
+        
+        print_success "Yarn Berry configured for user-space operation"
+    fi
+    
     # Aggressive cleanup of any existing installation artifacts
     print_status "Performing deep cleanup of existing installation..."
     
@@ -305,6 +325,14 @@ setup_frontend_environment() {
     # Clean various caches
     if command_exists yarn; then
         print_status "Cleaning modern yarn cache..."
+        
+        # Configure yarn for user-space if it's Berry
+        if yarn --version | grep -q "^[4-9]"; then
+            export YARN_CACHE_FOLDER="$HOME/.cache/yarn"
+            export YARN_GLOBAL_FOLDER="$HOME/.config/yarn/global"
+            mkdir -p "$YARN_CACHE_FOLDER" "$YARN_GLOBAL_FOLDER" 2>/dev/null || true
+        fi
+        
         yarn cache clean 2>/dev/null || true
     fi
     
@@ -330,6 +358,12 @@ setup_frontend_environment() {
     # First attempt: Modern Yarn with network timeout
     if command_exists yarn && [ "$INSTALL_SUCCESS" = false ]; then
         print_status "Attempting installation with modern Yarn..."
+        
+        # Ensure Yarn Berry uses user-space directories
+        export YARN_CACHE_FOLDER="$HOME/.cache/yarn"
+        export YARN_GLOBAL_FOLDER="$HOME/.config/yarn/global"
+        export YARN_ENABLE_TELEMETRY=false
+        mkdir -p "$YARN_CACHE_FOLDER" "$YARN_GLOBAL_FOLDER" 2>/dev/null || true
         
         # Clear yarn cache first (Berry compatible)
         yarn cache clean 2>/dev/null || true
@@ -428,6 +462,13 @@ setup_frontend_environment() {
         
         # Clear all caches
         npm cache clean --force 2>/dev/null || true
+        
+        # Configure yarn for user-space before cleaning cache
+        if command_exists yarn && yarn --version | grep -q "^[4-9]"; then
+            export YARN_CACHE_FOLDER="$HOME/.cache/yarn"
+            export YARN_GLOBAL_FOLDER="$HOME/.config/yarn/global" 
+            mkdir -p "$YARN_CACHE_FOLDER" "$YARN_GLOBAL_FOLDER" 2>/dev/null || true
+        fi
         yarn cache clean 2>/dev/null || true
         
         # Remove and reinstall dependencies with npm (most reliable)
