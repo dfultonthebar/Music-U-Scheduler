@@ -88,6 +88,5 @@ export const authOptions: NextAuthOptions = {
       return baseUrl
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
-  debug: true, // Enable debug mode for troubleshooting
+  secret: process.env.NEXTAUTH_SECRET
 }
