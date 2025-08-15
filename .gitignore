@@ -1,22 +1,30 @@
-# Node.js / Frontend
-**/node_modules
-.next
-*.nfs*
-**/.yarn/
-!**/.yarn/patches
-!**/.yarn/plugins
-!**/.yarn/releases
-!**/.yarn/sdks
-!**/.yarn/versions
-!**/.yarn/cache
-**/.yarn/build-state.yml
-**/.yarn/install-state.gz
-*.tsbuildinfo
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Dependencies
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
 
-# Python / Backend
+# Production build files
+.next/
+*/.next/
+out/
+*/out/
+.build/
+*/.build/
+
+# Environment files
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Cache files
+.cache/
+*/.cache/
+*.tsbuildinfo
+.turbo
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -34,71 +42,65 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
-*.manifest
-*.spec
-pip-log.txt
-pip-delete-this-directory.txt
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-*.mo
-*.pot
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-instance/
-.webassets-cache
-.scrapy
-docs/_build/
-.ipynb_checkpoints
-profile_default/
-ipython_config.py
-.python-version
-__pypackages__/
-celerybeat-schedule
-celerybeat.pid
-*.sage.py
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
 
-# Common
-.cache
-.build
-out
-target
-.deploy
-.logs
-.env
-.venv
-env/
+# Databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Virtual environments
+music-u-env/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
-.DS_Store
-Thumbs.db
-*.db
-*.sqlite
-logs/
+
+# Package manager lock files (keep package.json but ignore locks for fresh installs)
+package-lock.json
+yarn.lock
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.logs/
+logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Patch files
+*.patch
+*.tar.gz
+
+# PDF documentation files (keep .md files only)
+*.pdf
