@@ -121,12 +121,15 @@ install_system_dependencies() {
 install_nodejs() {
     print_section "Installing Node.js and NPM"
     
+    # Convert OS to lowercase for comparison
+    OS_LOWER=$(echo "$OS" | tr '[:upper:]' '[:lower:]')
+    
     # Install Node.js using NodeSource repository
-    if [[ "$OS" == "ubuntu" ]] || [[ "$OS" == "debian" ]]; then
+    if [[ "$OS_LOWER" == "ubuntu" ]] || [[ "$OS_LOWER" == "debian" ]]; then
         print_status "Installing Node.js $NODE_VERSION via NodeSource..."
         curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -
         sudo apt-get install -y nodejs
-    elif [[ "$OS" == "centos" ]] || [[ "$OS" == "rhel" ]] || [[ "$OS" == "fedora" ]]; then
+    elif [[ "$OS_LOWER" == "centos" ]] || [[ "$OS_LOWER" == "rhel" ]] || [[ "$OS_LOWER" == "fedora" ]]; then
         print_status "Installing Node.js $NODE_VERSION via NodeSource..."
         curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | sudo bash -
         if command_exists dnf; then
@@ -135,17 +138,43 @@ install_nodejs() {
             sudo yum install -y nodejs npm
         fi
     else
-        # Fallback: Install via NVM
+        # Fallback: Install via NVM with proper environment setup
         print_status "Installing Node.js via NVM..."
-        if [ ! -d "$HOME/.nvm" ]; then
-            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+        
+        # Remove any existing NVM installation
+        rm -rf "$HOME/.nvm"
+        
+        # Install NVM
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+        
+        # Source NVM properly
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+        
+        # Wait a moment for NVM to be fully loaded
+        sleep 2
+        
+        # Check if NVM is available
+        if ! command_exists nvm; then
+            print_error "NVM installation failed. Trying alternative approach..."
+            # Try to source from common locations
+            [ -s "$HOME/.nvm/nvm.sh" ] && source "$HOME/.nvm/nvm.sh"
+            [ -s "/usr/local/share/nvm/nvm.sh" ] && source "/usr/local/share/nvm/nvm.sh"
+            
+            if ! command_exists nvm; then
+                print_error "Cannot load NVM. Please install Node.js manually."
+                exit 1
+            fi
         fi
+        
+        # Install and use Node.js
         nvm install $NODE_VERSION
         nvm use $NODE_VERSION
         nvm alias default $NODE_VERSION
+        
+        # Ensure node and npm are in PATH
+        export PATH="$NVM_DIR/versions/node/v$(nvm version)/bin:$PATH"
     fi
     
     # Verify Node.js installation
@@ -153,7 +182,18 @@ install_nodejs() {
         print_success "Node.js $(node --version) and npm $(npm --version) installed successfully"
     else
         print_error "Node.js installation failed!"
-        exit 1
+        print_status "Attempting to fix PATH and retry..."
+        
+        # Try to add common Node.js paths
+        export PATH="/usr/bin:$PATH"
+        export PATH="$HOME/.nvm/versions/node/v$NODE_VERSION/bin:$PATH"
+        
+        if command_exists node && command_exists npm; then
+            print_success "Node.js $(node --version) and npm $(npm --version) installed successfully"
+        else
+            print_error "Node.js installation failed completely!"
+            exit 1
+        fi
     fi
 }
 
