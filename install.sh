@@ -148,18 +148,22 @@ create_desktop_entry() {
         cp "$INSTALL_DIR/assets/icon.png" "$ICON_FILE"
     fi
     
-    # Create desktop file with correct path to app/main.py
-    cat > "$DESKTOP_FILE" << EOF
+    # Create desktop file with correct module invocation
+    cat > "$DESKTOP_FILE" << 'EOF'
 [Desktop Entry]
 Name=Music-U-Scheduler
 Comment=Music practice scheduler and progress tracker
-Exec=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/app/main.py
+Exec=bash -c "cd $INSTALL_DIR && source venv/bin/activate && python -m app.main"
 Icon=$ICON_FILE
 Terminal=false
 Type=Application
 Categories=Education;Music;
 StartupWMClass=Music-U-Scheduler
 EOF
+    
+    # Replace variables in the desktop file
+    sed -i "s|\$INSTALL_DIR|$INSTALL_DIR|g" "$DESKTOP_FILE"
+    sed -i "s|\$ICON_FILE|$ICON_FILE|g" "$DESKTOP_FILE"
     
     chmod +x "$DESKTOP_FILE"
     
@@ -185,9 +189,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Change to the application directory
 cd "$SCRIPT_DIR"
 
-# Activate virtual environment and run the application
+# Activate virtual environment and run the application using module syntax
 source venv/bin/activate
-python app/main.py
+python -m app.main
 EOF
     
     chmod +x "$INSTALL_DIR/launch.sh"
@@ -227,7 +231,7 @@ show_final_instructions() {
     echo "3. Manual activation:"
     echo "   cd $INSTALL_DIR"
     echo "   source venv/bin/activate"
-    echo "   python app/main.py"
+    echo "   python -m app.main"
     echo
     echo "For updates, simply run this installer again."
     echo
