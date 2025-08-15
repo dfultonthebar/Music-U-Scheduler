@@ -25,3 +25,4 @@
  GET /api/auth/csrf 200 in 19ms
  ✓ Compiled /api/auth/[...nextauth] in 425ms (524 modules)
  POST /api/auth/callback/credentials 302 in 867ms
+[?25h
