@@ -5,11 +5,11 @@ import { cookies } from 'next/headers'
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
-    const email = formData.get('email') as string
+    const username = formData.get('username') as string
     const password = formData.get('password') as string
 
     // Mock authentication - replace with real auth
-    if (email === 'admin@musicu.com' && password === 'MusicU2025') {
+    if (username === 'admin' && password === 'MusicU2025') {
       // Set a simple session cookie
       const response = NextResponse.redirect(new URL('/admin', request.url))
       response.cookies.set('session', 'admin-session', {
