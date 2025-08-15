@@ -100,9 +100,8 @@ install_nodejs_yarn() {
     fi
     
     # Check if Node.js is already available through existing installation
-    if [ -f "/usr/local/nvm/versions/node/v22.14.0/bin/node" ]; then
-        print_status "Using existing Node.js installation"
-        export PATH="/usr/local/nvm/versions/node/v22.14.0/bin:$PATH"
+    if command_exists node && [ "$(node --version | cut -d. -f1 | sed 's/v//')" -ge "18" ]; then
+        print_status "Using existing Node.js installation: $(node --version)"
     else
         # Install Node.js via NodeSource repository
         print_status "Installing Node.js via NodeSource..."
@@ -201,32 +200,30 @@ install_nodejs_yarn() {
 handle_existing_installation() {
     if [ -d "$INSTALL_DIR" ]; then
         print_warning "Existing installation found at $INSTALL_DIR"
+        print_status "Performing CLEAN INSTALL - removing old installation completely..."
         
-        # Check if it's a git repository
-        if [ -d "$INSTALL_DIR/.git" ]; then
-            print_status "Updating existing installation..."
-            cd "$INSTALL_DIR"
-            
-            # Save any local changes
-            if ! git diff --quiet || ! git diff --cached --quiet; then
-                print_warning "Local changes detected. Stashing them..."
-                git stash push -m "Auto-stash before update $(date)"
-            fi
-            
-            # Pull latest changes
-            git fetch origin
-            git reset --hard origin/main
-            print_success "Repository updated to latest version"
-        else
-            print_warning "Directory exists but is not a git repository. Removing and recloning..."
-            rm -rf "$INSTALL_DIR"
-            git clone "$REPO_URL" "$INSTALL_DIR"
-            print_success "Repository cloned fresh"
-        fi
+        # Stop any running services first
+        sudo systemctl stop music-u-scheduler 2>/dev/null || true
+        sudo systemctl stop music-u-scheduler-frontend 2>/dev/null || true
+        sudo systemctl stop music-u-scheduler-backend 2>/dev/null || true
+        
+        # Remove the entire directory to ensure clean installation
+        rm -rf "$INSTALL_DIR"
+        print_success "Old installation completely removed"
+        
+        # Wait a moment for filesystem operations to complete
+        sleep 2
+    fi
+    
+    # Always clone fresh (whether directory existed or not)
+    print_status "Cloning latest version from repository..."
+    git clone "$REPO_URL" "$INSTALL_DIR"
+    
+    if [ -d "$INSTALL_DIR" ]; then
+        print_success "Repository cloned successfully - CLEAN INSTALLATION COMPLETE"
     else
-        print_status "Cloning repository..."
-        git clone "$REPO_URL" "$INSTALL_DIR"
-        print_success "Repository cloned successfully"
+        print_error "Failed to clone repository"
+        exit 1
     fi
 }
 
@@ -278,9 +275,8 @@ setup_frontend_environment() {
     cd "$INSTALL_DIR/frontend"
     
     # Ensure Node.js and Yarn are in PATH
-    if [ -f "/usr/local/nvm/versions/node/v22.14.0/bin/node" ]; then
-        export PATH="/usr/local/nvm/versions/node/v22.14.0/bin:$PATH"
-    fi
+    export PATH="/usr/local/bin:/usr/bin:$PATH"
+    hash -r
     
     # Aggressive cleanup of any existing installation artifacts
     print_status "Performing deep cleanup of existing installation..."
@@ -701,6 +697,12 @@ EOF
     
     # Create frontend service file
     if [ -d "$INSTALL_DIR/frontend" ]; then
+        # Detect yarn path dynamically
+        YARN_PATH=$(which yarn)
+        if [ -z "$YARN_PATH" ]; then
+            YARN_PATH="/usr/local/bin/yarn"  # Fallback
+        fi
+        
         sudo tee "/etc/systemd/system/$SERVICE_NAME-frontend.service" > /dev/null <<EOF
 [Unit]
 Description=Music-U-Scheduler Frontend
@@ -712,9 +714,9 @@ Type=simple
 User=$USER
 Group=$USER
 WorkingDirectory=$INSTALL_DIR/frontend
-Environment=PATH=/usr/local/nvm/versions/node/v22.14.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
-ExecStart=/usr/local/nvm/versions/node/v22.14.0/bin/yarn start
+ExecStart=$YARN_PATH start
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
