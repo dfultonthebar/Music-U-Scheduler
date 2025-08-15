@@ -154,9 +154,34 @@ export interface InstructorRole {
   name: string;
   description: string;
   permissions: string[];
+  is_custom?: boolean;
+  created_by?: string;
+  created_at?: string;
 }
 
 export interface AssignRoleData {
   instructor_id: string;
   role_id: string;
+}
+
+export interface CreateRoleData {
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface UpdateRoleData {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface InstructorWithRoles extends User {
+  assigned_roles: InstructorRole[];
+}
+
+export interface PromoteToAdminData {
+  user_id: string;
+  maintain_instructor_status?: boolean;
 }

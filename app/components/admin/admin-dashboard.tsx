@@ -29,6 +29,7 @@ import {
 import { DashboardStats, User, Lesson, AuditLog } from '@/lib/types';
 import { toast } from 'sonner';
 import UserManagement from './user-management';
+import RoleManagement from './role-management';
 import EmailSettings from './email-settings';
 import SystemBackupManager from './system-backup';
 import GitHubUpdates from './github-updates';
@@ -135,7 +136,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-9 bg-white rounded-lg shadow-sm">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-10 bg-white rounded-lg shadow-sm">
             <TabsTrigger value="dashboard" className="flex items-center gap-2 text-xs lg:text-sm">
               <LayoutDashboard className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -143,6 +144,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="user-management" className="flex items-center gap-2 text-xs lg:text-sm">
               <UserPlus className="w-4 h-4" />
               <span className="hidden sm:inline">Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="role-management" className="flex items-center gap-2 text-xs lg:text-sm">
+              <UserCheck className="w-4 h-4" />
+              <span className="hidden sm:inline">Roles</span>
             </TabsTrigger>
             <TabsTrigger value="lessons" className="flex items-center gap-2 text-xs lg:text-sm">
               <BookOpen className="w-4 h-4" />
@@ -270,6 +275,11 @@ export default function AdminDashboard() {
           {/* Enhanced User Management Tab */}
           <TabsContent value="user-management" className="space-y-6">
             <UserManagement />
+          </TabsContent>
+
+          {/* Role Management Tab */}
+          <TabsContent value="role-management" className="space-y-6">
+            <RoleManagement />
           </TabsContent>
 
           {/* Email Settings Tab */}

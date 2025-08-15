@@ -14,7 +14,11 @@ import {
   SystemBackup,
   GitHubUpdate,
   InstructorRole,
-  AssignRoleData
+  AssignRoleData,
+  CreateRoleData,
+  UpdateRoleData,
+  InstructorWithRoles,
+  PromoteToAdminData
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
@@ -28,11 +32,42 @@ class APIError extends Error {
 
 class APIService {
   private token: string | null = null;
+  private mockUsers: User[] = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
     }
+    this.initializeMockData();
+  }
+
+  private initializeMockData() {
+    this.mockUsers = [
+      {
+        id: 'user-1',
+        username: 'john_instructor',
+        email: 'john@example.com',
+        first_name: 'John',
+        last_name: 'Smith',
+        phone: '(555) 123-4567',
+        role: 'instructor',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'user-2',
+        username: 'jane_instructor',
+        email: 'jane@example.com',
+        first_name: 'Jane',
+        last_name: 'Doe',
+        phone: '(555) 987-6543',
+        role: 'instructor',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
   }
 
   setToken(token: string) {
@@ -525,6 +560,118 @@ class APIService {
       });
     } catch (error) {
       console.log('Assign role mock:', data);
+    }
+  }
+
+  async removeInstructorRole(instructorId: string, roleId: string): Promise<void> {
+    try {
+      await this.makeRequest<void>(`/admin/instructor-roles/remove/${instructorId}/${roleId}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.log('Remove role mock:', { instructorId, roleId });
+    }
+  }
+
+  async createInstructorRole(data: CreateRoleData): Promise<InstructorRole> {
+    try {
+      return await this.makeRequest<InstructorRole>('/admin/instructor-roles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      // Mock response for testing
+      const newRole: InstructorRole = {
+        id: `custom-role-${Date.now()}`,
+        name: data.name,
+        description: data.description,
+        permissions: data.permissions,
+        is_custom: true,
+        created_by: 'admin',
+        created_at: new Date().toISOString()
+      };
+      console.log('Create role mock:', newRole);
+      return newRole;
+    }
+  }
+
+  async updateInstructorRole(data: UpdateRoleData): Promise<InstructorRole> {
+    try {
+      return await this.makeRequest<InstructorRole>(`/admin/instructor-roles/${data.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      // Mock response for testing
+      const updatedRole: InstructorRole = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        permissions: data.permissions,
+        is_custom: true,
+        created_by: 'admin',
+        created_at: new Date().toISOString()
+      };
+      console.log('Update role mock:', updatedRole);
+      return updatedRole;
+    }
+  }
+
+  async deleteInstructorRole(roleId: string): Promise<void> {
+    try {
+      await this.makeRequest<void>(`/admin/instructor-roles/${roleId}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.log('Delete role mock:', roleId);
+    }
+  }
+
+  async getInstructorWithRoles(instructorId: string): Promise<InstructorWithRoles> {
+    try {
+      return await this.makeRequest<InstructorWithRoles>(`/admin/instructors/${instructorId}/roles`);
+    } catch (error) {
+      // Mock response for testing - find instructor and add roles
+      const instructor = this.mockUsers.find(u => u.id === instructorId && u.role === 'instructor');
+      if (!instructor) {
+        throw new Error('Instructor not found');
+      }
+      
+      const instructorWithRoles: InstructorWithRoles = {
+        ...instructor,
+        assigned_roles: [
+          {
+            id: 'role-1',
+            name: 'Piano Instructor',
+            description: 'Certified piano teacher',
+            permissions: ['teach_piano', 'schedule_lessons', 'view_students']
+          }
+        ]
+      };
+      return instructorWithRoles;
+    }
+  }
+
+  async promoteToAdmin(data: PromoteToAdminData): Promise<User> {
+    try {
+      return await this.makeRequest<User>('/admin/users/promote-to-admin', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      // Mock response for testing
+      const userIndex = this.mockUsers.findIndex(u => u.id === data.user_id);
+      if (userIndex === -1) {
+        throw new Error('User not found');
+      }
+      
+      this.mockUsers[userIndex] = {
+        ...this.mockUsers[userIndex],
+        role: 'admin'
+      };
+      
+      console.log('Promote to admin mock:', this.mockUsers[userIndex]);
+      return this.mockUsers[userIndex];
     }
   }
 

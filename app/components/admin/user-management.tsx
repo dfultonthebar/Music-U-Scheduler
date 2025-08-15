@@ -12,15 +12,19 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, Users, UserPlus, GraduationCap } from 'lucide-react';
+import { Plus, Trash2, Edit, Users, UserPlus, GraduationCap, Crown, X, Shield, UserCheck } from 'lucide-react';
 import { apiService } from '@/lib/api';
-import { User, CreateUserData, InstructorRole } from '@/lib/types';
+import { User, CreateUserData, InstructorRole, InstructorWithRoles, PromoteToAdminData } from '@/lib/types';
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [instructorRoles, setInstructorRoles] = useState<InstructorRole[]>([]);
+  const [instructorsWithRoles, setInstructorsWithRoles] = useState<Record<string, InstructorRole[]>>({});
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showMultiRoleDialog, setShowMultiRoleDialog] = useState(false);
+  const [selectedInstructor, setSelectedInstructor] = useState<User | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [createFormData, setCreateFormData] = useState<CreateUserData>({
     username: '',
     email: '',
@@ -107,6 +111,95 @@ export default function UserManagement() {
       toast.success('Instructor role assigned successfully');
     } catch (error) {
       toast.success('Instructor role assigned (mock)');
+    }
+  };
+
+  const handleManageInstructorRoles = async (instructor: User) => {
+    setSelectedInstructor(instructor);
+    try {
+      // Load instructor's current roles
+      const instructorWithRoles = await apiService.getInstructorWithRoles(instructor.id);
+      setSelectedRoles(instructorWithRoles.assigned_roles.map(role => role.id));
+      setShowMultiRoleDialog(true);
+    } catch (error) {
+      // Fallback to empty roles
+      setSelectedRoles([]);
+      setShowMultiRoleDialog(true);
+    }
+  };
+
+  const handleUpdateInstructorRoles = async () => {
+    if (!selectedInstructor) return;
+
+    try {
+      // Get current roles
+      const currentRoles = instructorsWithRoles[selectedInstructor.id] || [];
+      const currentRoleIds = currentRoles.map(role => role.id);
+
+      // Find roles to add and remove
+      const rolesToAdd = selectedRoles.filter(roleId => !currentRoleIds.includes(roleId));
+      const rolesToRemove = currentRoleIds.filter(roleId => !selectedRoles.includes(roleId));
+
+      // Add new roles
+      for (const roleId of rolesToAdd) {
+        await apiService.assignInstructorRole({
+          instructor_id: selectedInstructor.id,
+          role_id: roleId
+        });
+      }
+
+      // Remove old roles
+      for (const roleId of rolesToRemove) {
+        await apiService.removeInstructorRole(selectedInstructor.id, roleId);
+      }
+
+      // Update local state
+      const updatedRoles = instructorRoles.filter(role => selectedRoles.includes(role.id));
+      setInstructorsWithRoles(prev => ({
+        ...prev,
+        [selectedInstructor.id]: updatedRoles
+      }));
+
+      setShowMultiRoleDialog(false);
+      setSelectedInstructor(null);
+      setSelectedRoles([]);
+      toast.success('Instructor roles updated successfully');
+    } catch (error) {
+      toast.error('Failed to update instructor roles');
+    }
+  };
+
+  const handlePromoteToAdmin = async (user: User) => {
+    try {
+      const promoteData: PromoteToAdminData = {
+        user_id: user.id,
+        maintain_instructor_status: user.role === 'instructor'
+      };
+
+      const updatedUser = await apiService.promoteToAdmin(promoteData);
+      
+      // Update user in the list
+      setUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
+      
+      toast.success(`${user.first_name} ${user.last_name} has been promoted to admin`);
+    } catch (error) {
+      toast.error(`Failed to promote ${user.first_name} ${user.last_name} to admin`);
+    }
+  };
+
+  const handleRemoveRole = async (instructorId: string, roleId: string) => {
+    try {
+      await apiService.removeInstructorRole(instructorId, roleId);
+      
+      // Update local state
+      setInstructorsWithRoles(prev => ({
+        ...prev,
+        [instructorId]: (prev[instructorId] || []).filter(role => role.id !== roleId)
+      }));
+
+      toast.success('Role removed successfully');
+    } catch (error) {
+      toast.error('Failed to remove role');
     }
   };
 
@@ -306,19 +399,35 @@ export default function UserManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Select value={instructor.role} onValueChange={(value) => handleRoleChange(instructor.id, value)}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="instructor">Instructor</SelectItem>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {instructor.role !== 'admin' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePromoteToAdmin(instructor)}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Crown className="w-4 h-4 mr-1" />
+                        Make Admin
+                      </Button>
+                    )}
+                    {instructor.role === 'admin' && (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                        <Crown className="w-3 h-3 mr-1" />
+                        Admin
+                      </Badge>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleManageInstructorRoles(instructor)}
+                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                    >
+                      <UserCheck className="w-4 h-4 mr-1" />
+                      Manage Roles
+                    </Button>
                     <Select onValueChange={(value) => handleAssignInstructorRole(instructor.id, value)}>
                       <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Assign role" />
+                        <SelectValue placeholder="Quick assign" />
                       </SelectTrigger>
                       <SelectContent>
                         {instructorRoles.map((role) => (
@@ -434,6 +543,114 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Multi-Role Management Dialog */}
+      <Dialog open={showMultiRoleDialog} onOpenChange={(open) => {
+        setShowMultiRoleDialog(open);
+        if (!open) {
+          setSelectedInstructor(null);
+          setSelectedRoles([]);
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Instructor Roles</DialogTitle>
+            <DialogDescription>
+              {selectedInstructor ? `Select multiple roles for ${selectedInstructor.first_name} ${selectedInstructor.last_name}` : 'Manage instructor specializations'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Current Roles */}
+            {selectedRoles.length > 0 && (
+              <div>
+                <Label className="text-base font-medium">Current Roles</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedRoles.map((roleId) => {
+                    const role = instructorRoles.find(r => r.id === roleId);
+                    return role ? (
+                      <Badge key={roleId} variant="secondary" className="bg-purple-100 text-purple-800">
+                        {role.name}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto p-0 ml-1 hover:bg-transparent"
+                          onClick={() => setSelectedRoles(prev => prev.filter(id => id !== roleId))}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Available Roles */}
+            <div>
+              <Label className="text-base font-medium">Available Roles</Label>
+              <p className="text-sm text-muted-foreground mb-4">Select multiple specializations</p>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                {instructorRoles.map((role) => {
+                  const isSelected = selectedRoles.includes(role.id);
+                  return (
+                    <div
+                      key={role.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                        isSelected 
+                          ? 'border-purple-500 bg-purple-50' 
+                          : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'
+                      }`}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedRoles(prev => prev.filter(id => id !== role.id));
+                        } else {
+                          setSelectedRoles(prev => [...prev, role.id]);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-4 h-4 border-2 rounded ${
+                          isSelected 
+                            ? 'border-purple-500 bg-purple-500' 
+                            : 'border-gray-300'
+                        }`}>
+                          {isSelected && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{role.name}</p>
+                          <p className="text-xs text-gray-500">{role.description}</p>
+                          {role.is_custom && (
+                            <Badge variant="outline" className="mt-1 text-xs">Custom</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowMultiRoleDialog(false);
+              setSelectedInstructor(null);
+              setSelectedRoles([]);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateInstructorRoles}>
+              Update Roles ({selectedRoles.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
