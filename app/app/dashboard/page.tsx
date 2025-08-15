@@ -2,7 +2,7 @@
 'use client';
 
 import ProtectedRoute from '@/components/layout/protected-route';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Music, LogOut, User, BookOpen } from 'lucide-react';
@@ -27,7 +27,7 @@ function GeneralDashboard() {
           
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{user?.first_name} {user?.last_name}</p>
+              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
             <Button
@@ -53,7 +53,7 @@ function GeneralDashboard() {
               </div>
               <CardTitle className="text-2xl">Welcome to Music-U-Scheduler!</CardTitle>
               <CardDescription>
-                Hello, {user?.first_name}! You're signed in as a {user?.role}.
+                Hello, {user?.name}! You're signed in as a {user?.role}.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">

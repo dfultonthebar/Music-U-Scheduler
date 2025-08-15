@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { Loader2, Music } from 'lucide-react';
 
@@ -11,12 +11,14 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (!isAuthenticated) {
-        router.push('/login');
-      } else if (user?.role === 'admin') {
+    if (loading) return; // Still loading
+
+    if (!isAuthenticated) {
+      router.push('/login');
+    } else if (user) {
+      if (user.role === 'admin') {
         router.push('/admin');
-      } else if (user?.role === 'instructor') {
+      } else if (user.role === 'instructor') {
         router.push('/instructor');
       } else {
         router.push('/dashboard');

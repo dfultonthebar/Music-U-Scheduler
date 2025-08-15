@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -19,12 +19,14 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (loading) return; // Still loading
+
+    if (!isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    if (!loading && user && allowedRoles && !allowedRoles.includes(user.role)) {
+    if (user && allowedRoles && !allowedRoles.includes(user.role)) {
       // Redirect to appropriate dashboard based on role
       if (user.role === 'admin') {
         router.push('/admin');

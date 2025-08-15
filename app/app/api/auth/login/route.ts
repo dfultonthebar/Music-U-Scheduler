@@ -1,53 +1,37 @@
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const username = formData.get('username') as string;
-    const password = formData.get('password') as string;
+    const formData = await request.formData()
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
 
-    // Check for default admin credentials
-    if (username === 'admin' && password === 'MusicU2025') {
-      // Create a successful redirect response
-      const redirectUrl = new URL('/admin', request.url);
-      return NextResponse.redirect(redirectUrl, 302);
+    // Mock authentication - replace with real auth
+    if (email === 'admin@musicu.com' && password === 'MusicU2025') {
+      // Set a simple session cookie
+      const response = NextResponse.redirect(new URL('/admin', request.url))
+      response.cookies.set('session', 'admin-session', {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      })
+      return response
     }
 
-    // For other credentials, try the backend
-    try {
-      const backendFormData = new FormData();
-      backendFormData.append('username', username);
-      backendFormData.append('password', password);
-
-      const response = await fetch('http://localhost:8001/auth/login', {
-        method: 'POST',
-        body: backendFormData,
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        // Redirect based on user role
-        const redirectPath = userData.user?.role === 'admin' ? '/admin' : 
-                           userData.user?.role === 'instructor' ? '/instructor' : 
-                           '/dashboard';
-        const redirectUrl = new URL(redirectPath, request.url);
-        return NextResponse.redirect(redirectUrl, 302);
-      }
-    } catch (error) {
-      console.log('Backend not available, falling back to mock authentication');
-    }
-
-    // For testing purposes, create a mock successful response
-    if (username && password) {
-      const redirectUrl = new URL('/dashboard', request.url);
-      return NextResponse.redirect(redirectUrl, 302);
-    }
-
-    // Return error for missing credentials
-    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-    
+    // Default redirect to dashboard for any other credentials (for testing)
+    const response = NextResponse.redirect(new URL('/dashboard', request.url))
+    response.cookies.set('session', 'user-session', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 7 days
+    })
+    return response
   } catch (error) {
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 });
+    console.error('Login error:', error)
+    return NextResponse.json({ error: 'Login failed' }, { status: 500 })
   }
 }

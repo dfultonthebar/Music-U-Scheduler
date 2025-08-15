@@ -2,30 +2,58 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { useAuth } from '@/contexts/auth-context';
 import { Eye, EyeOff, Music, User, Lock } from 'lucide-react';
 
 export default function LoginForm() {
   const [credentials, setCredentials] = useState({
-    username: '',
+    email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
-  const { login } = useAuth();
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    const success = await login(credentials);
-    
-    setIsLoading(false);
+    try {
+      const formData = new FormData();
+      formData.append('email', credentials.email);
+      formData.append('password', credentials.password);
+
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        body: formData,
+        redirect: 'manual'
+      });
+
+      if (response.status === 0 || response.type === 'opaqueredirect') {
+        // Redirect happened, which means login was successful
+        window.location.reload();
+      } else if (response.ok) {
+        // Check where to redirect
+        if (credentials.email === 'admin@musicu.com') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
+      } else {
+        setError('Invalid email or password');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,21 +81,27 @@ export default function LoginForm() {
           
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                  {error}
+                </div>
+              )}
+              
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-sm font-medium text-gray-700">
-                  Username
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  Email
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
-                    id="username"
-                    name="username"
-                    type="text"
+                    id="email"
+                    name="email"
+                    type="email"
                     required
-                    value={credentials.username}
+                    value={credentials.email}
                     onChange={handleChange}
                     className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="Enter your username"
+                    placeholder="Enter your email"
                     disabled={isLoading}
                   />
                 </div>
@@ -122,7 +156,12 @@ export default function LoginForm() {
             </form>
           </CardContent>
           
-          <CardFooter className="text-center">
+          <CardFooter className="text-center space-y-2">
+            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded-md">
+              <p className="font-semibold">Default Admin Login:</p>
+              <p className="font-mono">Email: admin@musicu.com</p>
+              <p className="font-mono">Password: MusicU2025</p>
+            </div>
             <p className="text-sm text-gray-500">
               Music-U-Scheduler • Lesson Management System
             </p>
