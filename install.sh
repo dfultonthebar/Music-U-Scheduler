@@ -87,7 +87,17 @@ install_dependencies() {
 
 # Function to install Node.js and Yarn
 install_nodejs_yarn() {
-    print_status "Installing Node.js and Yarn..."
+    print_status "Setting up Node.js and Yarn..."
+    
+    # Remove any existing problematic yarn installations
+    print_status "Cleaning up any existing Node.js/Yarn installations..."
+    
+    # Remove yarn if it exists and is problematic
+    if command_exists yarn; then
+        print_status "Removing existing yarn installation..."
+        sudo npm uninstall -g yarn 2>/dev/null || true
+        sudo rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg 2>/dev/null || true
+    fi
     
     # Check if Node.js is already available through existing installation
     if [ -f "/usr/local/nvm/versions/node/v22.14.0/bin/node" ]; then
@@ -97,16 +107,20 @@ install_nodejs_yarn() {
         # Install Node.js via NodeSource repository
         print_status "Installing Node.js via NodeSource..."
         if command_exists apt-get; then
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            # Remove existing nodejs if it exists
+            sudo apt-get remove -y nodejs npm 2>/dev/null || true
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
             sudo apt-get install -y nodejs
         elif command_exists yum; then
-            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            sudo yum remove -y nodejs npm 2>/dev/null || true
+            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
             sudo yum install -y nodejs
         elif command_exists dnf; then
-            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            sudo dnf remove -y nodejs npm 2>/dev/null || true
+            curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
             sudo dnf install -y nodejs
         else
-            print_warning "Please install Node.js 18+ manually"
+            print_warning "Please install Node.js 20+ manually"
             return 1
         fi
     fi
@@ -119,13 +133,52 @@ install_nodejs_yarn() {
         return 1
     fi
     
-    # Install Yarn using npm
-    if ! command_exists yarn; then
-        print_status "Installing Yarn package manager..."
-        npm install -g yarn
-        print_success "Yarn installed successfully"
+    # Verify npm is available
+    if command_exists npm; then
+        print_success "NPM $(npm --version) is available"
     else
-        print_status "Yarn is already installed"
+        print_error "NPM is not available"
+        return 1
+    fi
+    
+    # Install Yarn using the official Yarn installation method
+    print_status "Installing Yarn package manager via official method..."
+    
+    # Method 1: Try via npm with specific version
+    if npm install -g yarn@1.22.22 2>/dev/null; then
+        print_success "Yarn installed via npm"
+    else
+        print_status "NPM method failed, trying Yarn official repository..."
+        
+        # Method 2: Official Yarn repository
+        if command_exists apt-get; then
+            curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+            echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+            sudo apt-get update && sudo apt-get install -y yarn
+        elif command_exists yum; then
+            curl -sS https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo
+            sudo yum install -y yarn
+        elif command_exists dnf; then
+            curl -sS https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo
+            sudo dnf install -y yarn
+        else
+            # Method 3: Direct download
+            print_status "Using direct Yarn installation..."
+            curl -o- -L https://yarnpkg.com/install.sh | bash
+            export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+        fi
+    fi
+    
+    # Verify Yarn installation
+    # Sometimes we need to refresh the PATH
+    export PATH="/usr/local/bin:/usr/bin:$PATH"
+    hash -r
+    
+    if command_exists yarn; then
+        print_success "Yarn $(yarn --version) installed successfully"
+    else
+        print_error "Yarn installation failed - will use npm as fallback"
+        return 0  # Don't fail the entire installation
     fi
     
     return 0
@@ -250,14 +303,22 @@ setup_frontend_environment() {
     
     INSTALL_SUCCESS=false
     
+    # Ensure PATH includes yarn installation
+    export PATH="/usr/local/bin:/usr/bin:$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+    hash -r
+    
     # First attempt: Yarn with network timeout
     if command_exists yarn && [ "$INSTALL_SUCCESS" = false ]; then
         print_status "Attempting installation with Yarn..."
-        if yarn install --network-timeout 300000 --no-lockfile --ignore-engines 2>/dev/null; then
+        
+        # Clear yarn cache first
+        yarn cache clean --force 2>/dev/null || true
+        
+        if yarn install --network-timeout 300000 --no-lockfile --ignore-engines --prefer-offline; then
             INSTALL_SUCCESS=true
             print_success "Frontend dependencies installed via Yarn"
         else
-            print_warning "Yarn install failed, trying other methods..."
+            print_warning "Yarn install failed, trying NPM methods..."
         fi
     fi
     
