@@ -1,0 +1,66 @@
+
+{% extends "base/layout.html" %}
+
+{% block title %}Instructor Dashboard - Music U Scheduler{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item">
+    <a class="nav-link" href="/instructor/dashboard">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/instructor/schedule">
+        <i class="fas fa-calendar"></i> Schedule
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/instructor/students">
+        <i class="fas fa-users"></i> Students
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/instructor/lessons">
+        <i class="fas fa-music"></i> Lessons
+    </a>
+</li>
+{% endblock %}
+
+{% block sidebar %}
+<nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+    <div class="position-sticky pt-3">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if request.url.path == '/instructor/dashboard' else '' }}" href="/instructor/dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/instructor/schedule' in request.url.path else '' }}" href="/instructor/schedule">
+                    <i class="fas fa-calendar"></i> My Schedule
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/instructor/students' in request.url.path else '' }}" href="/instructor/students">
+                    <i class="fas fa-users"></i> My Students
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/instructor/lessons' in request.url.path else '' }}" href="/instructor/lessons">
+                    <i class="fas fa-music"></i> Lesson Management
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/instructor/reports' in request.url.path else '' }}" href="/instructor/reports">
+                    <i class="fas fa-chart-bar"></i> My Reports
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/instructor/profile' in request.url.path else '' }}" href="/instructor/profile">
+                    <i class="fas fa-user"></i> Profile
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+{% endblock %}

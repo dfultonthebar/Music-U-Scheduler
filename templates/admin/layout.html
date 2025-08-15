@@ -1,0 +1,66 @@
+
+{% extends "base/layout.html" %}
+
+{% block title %}Admin Dashboard - Music U Scheduler{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item">
+    <a class="nav-link" href="/admin/dashboard">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/admin/users">
+        <i class="fas fa-users"></i> Users
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/admin/lessons">
+        <i class="fas fa-calendar"></i> Lessons
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/admin/reports">
+        <i class="fas fa-chart-bar"></i> Reports
+    </a>
+</li>
+{% endblock %}
+
+{% block sidebar %}
+<nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+    <div class="position-sticky pt-3">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if request.url.path == '/admin/dashboard' else '' }}" href="/admin/dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/admin/users' in request.url.path else '' }}" href="/admin/users">
+                    <i class="fas fa-users"></i> User Management
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/admin/lessons' in request.url.path else '' }}" href="/admin/lessons">
+                    <i class="fas fa-calendar"></i> Lesson Management
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/admin/reports' in request.url.path else '' }}" href="/admin/reports">
+                    <i class="fas fa-chart-bar"></i> Reports
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/admin/settings' in request.url.path else '' }}" href="/admin/settings">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if '/admin/audit-logs' in request.url.path else '' }}" href="/admin/audit-logs">
+                    <i class="fas fa-list"></i> Audit Logs
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+{% endblock %}
