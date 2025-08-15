@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
 import {
@@ -84,7 +85,7 @@ export default function Navigation() {
   return (
     <>
       {/* Desktop Navigation */}
-      <nav className="hidden lg:block bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+      <nav className="hidden lg:block bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
@@ -125,6 +126,9 @@ export default function Navigation() {
 
             {/* User Menu */}
             <div className="flex items-center gap-4">
+              {/* Theme Toggle */}
+              <ThemeToggle />
+
               {/* Notifications */}
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="w-4 h-4" />
@@ -176,7 +180,7 @@ export default function Navigation() {
       </nav>
 
       {/* Mobile Navigation */}
-      <nav className="lg:hidden bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+      <nav className="lg:hidden bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
