@@ -1,0 +1,4 @@
+components/instructor/instructor-dashboard.tsx(288,28): error TS18048: 'profile.specialties.length' is possibly 'undefined'.
+components/instructor/instructor-dashboard.tsx(289,29): error TS18047: 'profile' is possibly 'null'.
+components/instructor/instructor-dashboard.tsx(289,29): error TS18048: 'profile.specialties' is possibly 'undefined'.
+exit_code=2

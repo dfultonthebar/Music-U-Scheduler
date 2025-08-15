@@ -1,0 +1,9 @@
+lib/api.ts(604,31): error TS2339: Property 'mockUsers' does not exist on type 'APIService'.
+lib/api.ts(604,46): error TS7006: Parameter 'u' implicitly has an 'any' type.
+lib/api.ts(632,30): error TS2339: Property 'mockUsers' does not exist on type 'APIService'.
+lib/api.ts(632,50): error TS7006: Parameter 'u' implicitly has an 'any' type.
+lib/api.ts(637,12): error TS2339: Property 'mockUsers' does not exist on type 'APIService'.
+lib/api.ts(638,17): error TS2339: Property 'mockUsers' does not exist on type 'APIService'.
+lib/api.ts(642,50): error TS2339: Property 'mockUsers' does not exist on type 'APIService'.
+lib/api.ts(643,19): error TS2339: Property 'mockUsers' does not exist on type 'APIService'.
+exit_code=2

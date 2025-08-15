@@ -1,0 +1,11 @@
+[master 6f6d306] Modern Music-U-Scheduler Frontend Complete
+ 10 files changed, 388 insertions(+), 14 deletions(-)
+ rewrite .abacus.donotdelete (100%)
+ create mode 100644 DEPLOYMENT_GUIDE.md
+ create mode 100644 DEPLOYMENT_GUIDE.pdf
+ create mode 100644 app/app/api/auth/csrf/route.ts
+ create mode 100644 app/app/api/auth/login/route.ts
+ create mode 100644 app/app/api/auth/providers/route.ts
+ create mode 100644 app/app/api/auth/signup/route.ts
+ create mode 100644 app/app/api/health/route.ts
+###6f6d30654125308ca71d65ec16badfe128c1d6b6###

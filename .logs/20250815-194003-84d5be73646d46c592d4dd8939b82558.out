@@ -1,0 +1,8 @@
+[main 73f2825] Role selection and switching functionality
+ 9 files changed, 499 insertions(+), 5 deletions(-)
+ rewrite .abacus.donotdelete (97%)
+ create mode 100644 ROLE_SWITCHING_FEATURES.md
+ create mode 100644 ROLE_SWITCHING_FEATURES.pdf
+ create mode 100644 app/components/auth/role-selection.tsx
+ create mode 100644 app/role-selection/page.tsx
+###73f2825294a63e8949d4e770f56b29eeb6593cfa###

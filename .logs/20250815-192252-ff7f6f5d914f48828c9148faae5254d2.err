@@ -1,0 +1,12 @@
+ ⚠ ./components/admin/role-management.tsx
+Attempted import error: 'DialogTrigger' is not exported from '@/components/ui/alert-dialog' (imported as 'AlertDialogTrigger').
+
+Import trace for requested module:
+./components/admin/role-management.tsx
+./components/admin/admin-dashboard.tsx
+ ⚠ ./components/admin/role-management.tsx
+Attempted import error: 'DialogTrigger' is not exported from '@/components/ui/alert-dialog' (imported as 'AlertDialogTrigger').
+
+Import trace for requested module:
+./components/admin/role-management.tsx
+./components/admin/admin-dashboard.tsx

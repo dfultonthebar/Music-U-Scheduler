@@ -1,0 +1,32 @@
+  ▲ Next.js 14.2.28
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+  - Experiments (use with caution):
+    · outputFileTracingRoot
+
+ ✓ Starting...
+ ✓ Ready in 1501ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1629ms (489 modules)
+ GET / 200 in 1982ms
+ ✓ Compiled in 396ms (250 modules)
+ GET / 200 in 38ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1263ms (777 modules)
+ GET / 200 in 75ms
+ GET / 200 in 32ms
+ GET / 200 in 33ms
+ GET / 200 in 27ms
+ ✓ Compiled in 779ms (398 modules)
+ ✓ Compiled in 393ms (398 modules)
+ ✓ Compiled in 272ms (398 modules)
+ ✓ Compiled in 336ms (398 modules)
+ ✓ Compiled in 259ms (398 modules)
+ ✓ Compiled in 301ms (398 modules)
+ ✓ Compiled in 543ms (405 modules)
+ ✓ Compiled in 280ms (405 modules)
+ ✓ Compiled in 238ms (405 modules)
+ ✓ Compiled in 295ms (405 modules)
+ ✓ Compiled in 240ms (405 modules)
+ ✓ Compiled in 241ms (405 modules)
+[?25h

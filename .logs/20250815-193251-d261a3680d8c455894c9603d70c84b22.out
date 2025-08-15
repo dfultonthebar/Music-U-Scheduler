@@ -1,0 +1,5 @@
+[main 8b23669] Enhanced role management with custom roles and multi-role assignment
+ 6 files changed, 884 insertions(+), 16 deletions(-)
+ rewrite .abacus.donotdelete (98%)
+ create mode 100644 app/components/admin/role-management.tsx
+###8b23669372fd07c23fd6fb2c72a64963e9f7af5f###

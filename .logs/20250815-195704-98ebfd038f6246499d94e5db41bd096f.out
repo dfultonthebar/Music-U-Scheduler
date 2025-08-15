@@ -1,0 +1,23 @@
+[main ba4c260] Working authentication system fixed
+ 25 files changed, 2220 insertions(+), 113 deletions(-)
+ rewrite .abacus.donotdelete (98%)
+ create mode 100644 FRESH_INSTALL_GUIDE.md
+ create mode 100644 FRESH_INSTALL_GUIDE.pdf
+ create mode 100644 GITHUB_CLEANUP_INSTRUCTIONS.md
+ create mode 100644 GITHUB_CLEANUP_INSTRUCTIONS.pdf
+ create mode 100644 SYSTEM_READY_SUMMARY.md
+ create mode 100644 SYSTEM_READY_SUMMARY.pdf
+ create mode 100644 app/.env
+ rewrite app/.yarn/install-state.gz (80%)
+ create mode 100644 app/app/api/auth/[...nextauth]/route.ts
+ rewrite app/app/api/auth/login/route.ts (91%)
+ create mode 100644 app/app/api/auth/logout/route.ts
+ create mode 100644 app/app/api/auth/session/route.ts
+ create mode 100644 app/app/api/signup/route.ts
+ rewrite app/app/layout.tsx (63%)
+ create mode 100644 app/app/providers.tsx
+ create mode 100644 app/hooks/useAuth.ts
+ create mode 100644 app/lib/auth.ts
+ create mode 100755 quick-install.sh
+ create mode 100755 test-system.sh
+###ba4c26005ecc2dda9091099ced60a09503a13744###

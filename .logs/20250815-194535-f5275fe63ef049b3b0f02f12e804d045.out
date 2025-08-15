@@ -1,0 +1,2 @@
+app/api/auth/[...nextauth]/route.ts(68,38): error TS18046: 'token.role' is of type 'unknown'.
+exit_code=2

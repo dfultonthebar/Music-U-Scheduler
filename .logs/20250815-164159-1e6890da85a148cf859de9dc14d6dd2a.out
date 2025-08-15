@@ -1,0 +1,43 @@
+➤ YN0000: · Yarn 4.9.2
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + class-variance-authority@npm:0.7.1
+➤ YN0085: │ - @next-auth/prisma-adapter@npm:1.0.7, @panva/hkdf@npm:1.2.1, class-variance-authority@npm:0.7.0, clsx@npm:2.0.0, cookie@npm:0.7.2, jose@npm:4.15.9, and 10 more.
+➤ YN0000: └ Completed in 0s 287ms
+➤ YN0000: ┌ Post-resolution validation
+➤ YN0060: │ @typescript-eslint/parser is listed by your project with version 7.0.0 (p6cb6c), which doesn't satisfy what @typescript-eslint/eslint-plugin requests (^6.0.0-alpha).
+➤ YN0060: │ eslint is listed by your project with version 9.24.0 (pe6e00), which doesn't satisfy what @typescript-eslint/eslint-plugin and other dependencies request (^8.57.0).
+➤ YN0002: │ app@workspace:. doesn't provide prettier (pd88b5), requested by eslint-plugin-prettier.
+➤ YN0086: │ Some peer dependencies are incorrectly met by your project; run yarn explain peer-requirements <hash> for details, where <hash> is the six-letter p-prefixed code.
+➤ YN0086: │ Some peer dependencies are incorrectly met by dependencies; run yarn explain peer-requirements for details.
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ A package was added to the project (+ 23.55 KiB).
+➤ YN0000: └ Completed in 1s 78ms
+➤ YN0000: ┌ Link step
+➤ YN0000: └ Completed in 0s 892ms
+➤ YN0000: · Done with warnings in 2s 437ms
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.7.0) to ./node_modules/.prisma/client in 62ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Help us improve the Prisma ORM for everyone. Share your feedback in a short 2-min survey: https://pris.ly/orm/survey/release-5-22
+
+Starting server...
+  ▲ Next.js 14.2.28
+  - Local:        http://localhost:3000
+  - Experiments (use with caution):
+    · outputFileTracingRoot
+
+ ✓ Starting...
+ ✓ Ready in 1599ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.4s (496 modules)
+ GET / 200 in 2821ms
+ ✓ Compiled in 389ms (250 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 563ms (518 modules)
+ GET / 200 in 78ms
+ GET / 200 in 31ms
+ GET / 200 in 34ms

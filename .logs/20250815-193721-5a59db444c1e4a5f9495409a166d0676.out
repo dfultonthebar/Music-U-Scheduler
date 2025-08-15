@@ -1,0 +1,5 @@
+components/admin/admin-dashboard.tsx(54,18): error TS2339: Property 'assigned_roles' does not exist on type 'User'.
+components/instructor/instructor-dashboard.tsx(46,18): error TS2339: Property 'assigned_roles' does not exist on type 'User'.
+role-selection/page.tsx(27,15): error TS2339: Property 'assigned_roles' does not exist on type 'User'.
+role-selection/page.tsx(31,15): error TS2339: Property 'assigned_roles' does not exist on type 'User'.
+exit_code=2

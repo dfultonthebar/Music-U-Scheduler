@@ -1,170 +1,267 @@
-# 🎵 Music-U-Scheduler
 
-A comprehensive music lesson scheduling and management system with a modern web interface.
+# 🎵 Music U Scheduler
 
-## Features
+A comprehensive music lesson scheduling application built with Next.js (frontend) and FastAPI (backend), featuring JWT authentication, admin panels, instructor dashboards, and student management.
 
-- **Admin Dashboard**: Complete user and system management
-- **Instructor Interface**: Lesson scheduling and student management
-- **Student Portal**: View lessons and manage schedules
-- **Modern UI**: Built with Next.js and Tailwind CSS
-- **Secure Authentication**: Role-based access control
-- **Database Management**: PostgreSQL with Alembic migrations
-- **RESTful API**: FastAPI backend with automatic documentation
+## ✨ Features
 
-## Quick Start
+### 🔐 Authentication & Authorization
+- **JWT-based authentication** with secure session management
+- **Role-based access control** (Admin, Instructor, Student)
+- **Multi-role support** for instructors
+- **Secure password hashing** with bcrypt
+
+### 👥 User Management
+- **Admin Dashboard** with full system control
+- **Instructor Portal** for lesson and student management
+- **Student Interface** for booking and viewing lessons
+- **User profile management** with customizable settings
+
+### 📅 Scheduling System
+- **Interactive calendar** for lesson scheduling
+- **Recurring lesson support** with flexible patterns
+- **Conflict detection** and resolution
+- **Automated notifications** and reminders
+
+### 📊 Analytics & Reporting
+- **Revenue tracking** and financial reports
+- **Student progress monitoring**
+- **Instructor performance analytics**
+- **Customizable dashboard widgets**
+
+### ⚙️ Administration
+- **System settings** management
+- **Email server configuration**
+- **Backup and restore** functionality
+- **Audit logging** for security compliance
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 18+ 
+- **Python** 3.8+
+- **Git**
 
 ### One-Line Installation
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/your-username/music-u-scheduler/main/install-fixed.sh | bash
 ```
 
-### Manual Installation
+Or clone and install manually:
 
-1. **Clone the repository:**
+```bash
+git clone https://github.com/your-username/music-u-scheduler.git
+cd music-u-scheduler
+chmod +x install-fixed.sh
+./install-fixed.sh
+```
+
+### Starting the Application
+
+After installation, start all services:
+
+```bash
+./start-all.sh
+```
+
+Or manage services individually:
+
+```bash
+./manage-services.sh start    # Start all services
+./manage-services.sh stop     # Stop all services  
+./manage-services.sh restart  # Restart all services
+./manage-services.sh status   # Check service status
+```
+
+## 🌐 Access URLs
+
+Once running, access the application at:
+
+- **Frontend Application**: http://localhost:3000
+- **Backend API**: http://localhost:8080  
+- **API Documentation**: http://localhost:8080/docs
+- **Alternative API Docs**: http://localhost:8080/redoc
+
+## 📁 Project Structure
+
+```
+music-u-scheduler/
+├── app/                          # Next.js frontend & FastAPI backend
+│   ├── api/                      # API routes and controllers
+│   ├── app/                      # Next.js app directory
+│   ├── components/               # Reusable React components
+│   ├── auth/                     # Authentication logic
+│   ├── lib/                      # Utility libraries
+│   ├── prisma/                   # Database schema and migrations
+│   ├── main.py                   # FastAPI application entry point
+│   ├── models.py                 # Database models
+│   ├── schemas.py                # Pydantic schemas
+│   └── package.json              # Node.js dependencies
+├── music-u-env/                  # Python virtual environment
+├── static/                       # Static assets
+├── logs/                         # Application logs
+├── install-fixed.sh              # Installation script
+├── start-all.sh                  # Combined startup script
+├── start-backend.sh              # Backend startup script
+├── start-frontend.sh             # Frontend startup script
+├── manage-services.sh            # Service management script
+├── requirements.txt              # Python dependencies
+└── .env                          # Environment configuration
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+#### Backend Configuration (`.env`)
+```bash
+DATABASE_URL=sqlite:///./app.db
+ENVIRONMENT=development
+LOG_LEVEL=info
+```
+
+#### Frontend Configuration (`app/.env`)
+```bash
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-key
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
+
+### Database Setup
+
+The application uses SQLite by default for development. The database is automatically initialized during installation.
+
+For production, you can configure PostgreSQL by updating the `DATABASE_URL` in `.env`.
+
+## 🔧 Development
+
+### Running in Development Mode
+
+1. **Backend Development**:
    ```bash
-   git clone https://github.com/dfultonthebar/Music-U-Scheduler.git
-   cd Music-U-Scheduler
+   ./start-backend.sh
+   ```
+   The API will be available at http://localhost:8080 with auto-reload enabled.
+
+2. **Frontend Development**:
+   ```bash  
+   ./start-frontend.sh
+   ```
+   The web app will be available at http://localhost:3000 with hot-reload enabled.
+
+### API Testing
+
+Access the interactive API documentation:
+- **Swagger UI**: http://localhost:8080/docs
+- **ReDoc**: http://localhost:8080/redoc
+
+### Frontend Features
+
+The Next.js frontend includes:
+- **Server-side rendering** for improved SEO
+- **Responsive design** with Tailwind CSS
+- **Component library** with Radix UI
+- **Form validation** with React Hook Form
+- **State management** with Zustand
+
+## 📊 Default Users
+
+After installation, you can create admin users through the API or use the registration system.
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+1. **Port already in use**:
+   ```bash
+   ./manage-services.sh stop
+   ./manage-services.sh start
    ```
 
-2. **Run the installer:**
+2. **Services won't start**:
+   - Check that ports 3000 and 8080 are available
+   - Verify Python virtual environment is activated
+   - Check logs in the `logs/` directory
+
+3. **Database errors**:
+   - Delete `app.db` and restart to recreate database
+   - Check SQLite installation and permissions
+
+4. **Frontend build issues**:
    ```bash
-   chmod +x install.sh
-   ./install.sh
+   cd app
+   rm -rf .next node_modules
+   npm install
+   npm run build
    ```
 
-3. **Start the application:**
-   ```bash
-   ./start-musicu.sh
-   ```
+5. **Backend import errors**:
+   - Ensure you're running from the correct directory
+   - Verify Python virtual environment is activated
+   - Check that all dependencies are installed
 
-## Default Login
+### Getting Help
 
-- **Username:** `admin`
-- **Password:** `MusicU2025`
+1. Check the **logs** directory for error details
+2. Run `./manage-services.sh status` to verify service status
+3. Test API endpoints at http://localhost:8080/docs
+4. Verify environment configuration in `.env` files
 
-## Access URLs
+## 🚀 Deployment
 
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:8000
-- **API Documentation:** http://localhost:8000/docs
+### Production Deployment
 
-## Technology Stack
+For production deployment:
 
-### Backend (FastAPI)
-- **Framework:** FastAPI
-- **Database:** PostgreSQL
-- **ORM:** SQLAlchemy
-- **Migrations:** Alembic
-- **Authentication:** JWT tokens
+1. **Update environment variables** for production
+2. **Configure a proper database** (PostgreSQL recommended)
+3. **Set up a reverse proxy** (nginx recommended)
+4. **Configure SSL certificates**
+5. **Set up process management** (systemd, PM2, etc.)
 
-### Frontend (Next.js)
-- **Framework:** Next.js 14
-- **UI Components:** Shadcn/ui
-- **Styling:** Tailwind CSS
-- **Icons:** Lucide React
-- **Forms:** React Hook Form
-- **State Management:** Zustand
+### Docker Deployment
 
-## Project Structure
+Docker support coming soon.
 
-```
-Music-U-Scheduler/
-├── app/                    # FastAPI backend
-│   ├── api/               # API routes
-│   ├── auth/              # Authentication
-│   ├── models.py          # Database models
-│   ├── main.py            # FastAPI app
-│   └── database.py        # Database configuration
-├── frontend/              # Next.js frontend
-│   ├── app/               # App router pages
-│   ├── components/        # React components
-│   ├── lib/               # Utilities
-│   └── contexts/          # React contexts
-├── alembic/               # Database migrations
-├── install.sh             # Installation script
-├── start-musicu.sh        # Application launcher
-├── stop-musicu.sh         # Stop services
-└── requirements.txt       # Python dependencies
-```
+## 🔐 Security Considerations
 
-## Development
+- Change default JWT secrets in production
+- Use HTTPS in production environments
+- Configure CORS properly for your domain
+- Regular security updates for dependencies
+- Implement proper backup strategies
 
-### Backend Development
-```bash
-cd Music-U-Scheduler
-source music-u-env/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Frontend Development
-```bash
-cd Music-U-Scheduler/frontend
-npm run dev
-```
-
-### Database Migrations
-```bash
-# Create new migration
-alembic revision --autogenerate -m "Description"
-
-# Apply migrations
-alembic upgrade head
-```
-
-## API Documentation
-
-The API documentation is automatically generated and available at:
-- **Swagger UI:** http://localhost:8000/docs
-- **ReDoc:** http://localhost:8000/redoc
-
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test your changes
+4. Add tests if applicable
 5. Submit a pull request
 
-## License
+## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🆘 Support
 
-If you encounter any issues:
+For support and questions:
+- **Documentation**: Check this README and API docs
+- **Issues**: Use GitHub Issues for bug reports
+- **Discussions**: Use GitHub Discussions for questions
 
-1. Check the logs in `backend.log` and `frontend.log`
-2. Ensure PostgreSQL is running: `sudo systemctl status postgresql`
-3. Verify dependencies are installed correctly
-4. Create an issue on GitHub with error details
+## 🎯 Roadmap
 
-## Troubleshooting
+- [ ] Mobile app development
+- [ ] Advanced reporting features
+- [ ] Payment integration
+- [ ] Video lesson support
+- [ ] Multi-tenancy support
+- [ ] Docker containerization
+- [ ] Kubernetes deployment guides
 
-### Common Issues
+---
 
-**PostgreSQL not starting:**
-```bash
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
-```
-
-**Port already in use:**
-```bash
-sudo fuser -k 8000/tcp 3000/tcp
-```
-
-**Database connection issues:**
-```bash
-sudo -u postgres psql -c "CREATE DATABASE musicu;"
-sudo -u postgres psql -c "CREATE USER musicuuser WITH PASSWORD 'musicupass';"
-```
-
-**Frontend build errors:**
-```bash
-cd frontend
-rm -rf node_modules package-lock.json
-npm install --legacy-peer-deps
-npm run build
-```
+**Made with ❤️ for music educators and students**
