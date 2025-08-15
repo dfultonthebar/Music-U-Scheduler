@@ -141,32 +141,45 @@ install_nodejs_yarn() {
         return 1
     fi
     
-    # Install Yarn using the official Yarn installation method
-    print_status "Installing Yarn package manager via official method..."
+    # Remove any existing old Yarn installations
+    print_status "Removing old Yarn installations..."
     
-    # Method 1: Try via npm with specific version
-    if npm install -g yarn@1.22.22 2>/dev/null; then
-        print_success "Yarn installed via npm"
+    # Remove old Yarn via npm
+    npm uninstall -g yarn 2>/dev/null || true
+    
+    # Remove old Yarn via package managers
+    if command_exists apt-get; then
+        sudo apt-get remove -y yarn 2>/dev/null || true
+        sudo apt-key del 72ECF46A56B4AD39C907BBB71646B01B86E50310 2>/dev/null || true
+        sudo rm -f /etc/apt/sources.list.d/yarn.list
+    elif command_exists yum; then
+        sudo yum remove -y yarn 2>/dev/null || true
+        sudo rm -f /etc/yum.repos.d/yarn.repo
+    elif command_exists dnf; then
+        sudo dnf remove -y yarn 2>/dev/null || true
+        sudo rm -f /etc/yum.repos.d/yarn.repo
+    fi
+    
+    # Remove old Yarn directories
+    rm -rf ~/.yarn 2>/dev/null || true
+    rm -rf ~/.config/yarn 2>/dev/null || true
+    
+    print_success "Old Yarn installations removed"
+    
+    # Install modern Yarn (Berry) using official method
+    print_status "Installing modern Yarn (Berry) - latest version..."
+    
+    # Enable corepack (comes with Node 14.19+)
+    if command_exists corepack; then
+        print_status "Using corepack to install latest Yarn..."
+        sudo corepack enable
+        corepack prepare yarn@stable --activate
+        print_success "Yarn Berry installed via corepack"
     else
-        print_status "NPM method failed, trying Yarn official repository..."
-        
-        # Method 2: Official Yarn repository
-        if command_exists apt-get; then
-            curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-            echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-            sudo apt-get update && sudo apt-get install -y yarn
-        elif command_exists yum; then
-            curl -sS https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo
-            sudo yum install -y yarn
-        elif command_exists dnf; then
-            curl -sS https://dl.yarnpkg.com/rpm/yarn.repo | sudo tee /etc/yum.repos.d/yarn.repo
-            sudo dnf install -y yarn
-        else
-            # Method 3: Direct download
-            print_status "Using direct Yarn installation..."
-            curl -o- -L https://yarnpkg.com/install.sh | bash
-            export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
-        fi
+        # Fallback: Install latest Yarn via npm
+        print_status "Installing latest Yarn via npm..."
+        npm install -g yarn@latest
+        print_success "Yarn latest version installed via npm"
     fi
     
     # Verify Yarn installation
@@ -295,8 +308,8 @@ setup_frontend_environment() {
     
     # Clean various caches
     if command_exists yarn; then
-        print_status "Cleaning yarn cache..."
-        yarn cache clean --force 2>/dev/null || true
+        print_status "Cleaning modern yarn cache..."
+        yarn cache clean 2>/dev/null || true
     fi
     
     if command_exists npm; then
@@ -314,22 +327,23 @@ setup_frontend_environment() {
     
     INSTALL_SUCCESS=false
     
-    # Ensure PATH includes yarn installation
-    export PATH="/usr/local/bin:/usr/bin:$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+    # Ensure PATH includes current installations
+    export PATH="/usr/local/bin:/usr/bin:$PATH"
     hash -r
     
-    # First attempt: Yarn with network timeout
+    # First attempt: Modern Yarn with network timeout
     if command_exists yarn && [ "$INSTALL_SUCCESS" = false ]; then
-        print_status "Attempting installation with Yarn..."
+        print_status "Attempting installation with modern Yarn..."
         
-        # Clear yarn cache first
-        yarn cache clean --force 2>/dev/null || true
+        # Clear yarn cache first (Berry compatible)
+        yarn cache clean 2>/dev/null || true
         
-        if yarn install --network-timeout 300000 --no-lockfile --ignore-engines --prefer-offline; then
+        # For Yarn Berry, use modern installation approach
+        if yarn install --network-timeout 300000; then
             INSTALL_SUCCESS=true
-            print_success "Frontend dependencies installed via Yarn"
+            print_success "Frontend dependencies installed via modern Yarn"
         else
-            print_warning "Yarn install failed, trying NPM methods..."
+            print_warning "Modern Yarn install failed, trying NPM methods..."
         fi
     fi
     
@@ -418,7 +432,7 @@ setup_frontend_environment() {
         
         # Clear all caches
         npm cache clean --force 2>/dev/null || true
-        yarn cache clean --force 2>/dev/null || true
+        yarn cache clean 2>/dev/null || true
         
         # Remove and reinstall dependencies with npm (most reliable)
         rm -rf node_modules package-lock.json yarn.lock 2>/dev/null || true
