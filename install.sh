@@ -68,21 +68,67 @@ install_dependencies() {
     
     if command_exists apt-get; then
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip python3-venv git curl nginx openssl ufw
+        sudo apt-get install -y python3 python3-pip python3-venv git curl nginx openssl ufw postgresql postgresql-contrib
     elif command_exists yum; then
-        sudo yum install -y python3 python3-pip git curl nginx openssl firewalld
+        sudo yum install -y python3 python3-pip git curl nginx openssl firewalld postgresql postgresql-server
     elif command_exists dnf; then
-        sudo dnf install -y python3 python3-pip git curl nginx openssl firewalld
+        sudo dnf install -y python3 python3-pip git curl nginx openssl firewalld postgresql postgresql-server
     elif command_exists pacman; then
-        sudo pacman -S --noconfirm python python-pip git curl nginx openssl ufw
+        sudo pacman -S --noconfirm python python-pip git curl nginx openssl ufw postgresql
     elif command_exists brew; then
-        brew install python3 git curl nginx openssl
+        brew install python3 git curl nginx openssl postgresql
     else
         print_error "Unsupported package manager. Please install dependencies manually."
         exit 1
     fi
     
     print_success "System dependencies installed successfully"
+}
+
+# Function to install Node.js and Yarn
+install_nodejs_yarn() {
+    print_status "Installing Node.js and Yarn..."
+    
+    # Check if Node.js is already available through existing installation
+    if [ -f "/usr/local/nvm/versions/node/v22.14.0/bin/node" ]; then
+        print_status "Using existing Node.js installation"
+        export PATH="/usr/local/nvm/versions/node/v22.14.0/bin:$PATH"
+    else
+        # Install Node.js via NodeSource repository
+        print_status "Installing Node.js via NodeSource..."
+        if command_exists apt-get; then
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+        elif command_exists yum; then
+            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            sudo yum install -y nodejs
+        elif command_exists dnf; then
+            curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+            sudo dnf install -y nodejs
+        else
+            print_warning "Please install Node.js 18+ manually"
+            return 1
+        fi
+    fi
+    
+    # Verify Node.js installation
+    if command_exists node; then
+        print_success "Node.js $(node --version) installed successfully"
+    else
+        print_error "Node.js installation failed"
+        return 1
+    fi
+    
+    # Install Yarn using npm
+    if ! command_exists yarn; then
+        print_status "Installing Yarn package manager..."
+        npm install -g yarn
+        print_success "Yarn installed successfully"
+    else
+        print_status "Yarn is already installed"
+    fi
+    
+    return 0
 }
 
 # Function to handle existing installation
@@ -152,6 +198,43 @@ setup_python_environment() {
         print_warning "requirements.txt not found. Installing basic dependencies..."
         pip install tkinter customtkinter pillow fastapi uvicorn
     fi
+}
+
+# Function to setup frontend environment
+setup_frontend_environment() {
+    print_status "Setting up Next.js frontend environment..."
+    
+    if [ ! -d "$INSTALL_DIR/frontend" ]; then
+        print_warning "Frontend directory not found. Skipping frontend setup."
+        return 0
+    fi
+    
+    cd "$INSTALL_DIR/frontend"
+    
+    # Ensure Node.js and Yarn are in PATH
+    if [ -f "/usr/local/nvm/versions/node/v22.14.0/bin/node" ]; then
+        export PATH="/usr/local/nvm/versions/node/v22.14.0/bin:$PATH"
+    fi
+    
+    # Install frontend dependencies
+    print_status "Installing frontend dependencies..."
+    if command_exists yarn; then
+        yarn install
+        print_success "Frontend dependencies installed"
+    else
+        print_error "Yarn not found. Frontend setup failed."
+        return 1
+    fi
+    
+    # Build the frontend
+    print_status "Building frontend for production..."
+    if yarn build; then
+        print_success "Frontend built successfully"
+    else
+        print_warning "Frontend build failed, but continuing with development mode"
+    fi
+    
+    return 0
 }
 
 # Function to setup custom domain in hosts file
@@ -249,9 +332,9 @@ server {
     add_header X-XSS-Protection "1; mode=block";
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     
-    # Proxy configuration
-    location / {
-        proxy_pass http://127.0.0.1:$APP_PORT;
+    # API proxy configuration
+    location /api/ {
+        proxy_pass http://127.0.0.1:8001/;
         proxy_set_header Host \$http_host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -260,6 +343,38 @@ server {
         proxy_redirect off;
         
         # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+    
+    # FastAPI docs and admin endpoints
+    location ~ ^/(docs|redoc|openapi\.json|admin|health) {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$server_name;
+        proxy_redirect off;
+    }
+    
+    # Frontend proxy configuration
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$server_name;
+        proxy_redirect off;
+        
+        # WebSocket support for Next.js hot reload
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -334,15 +449,15 @@ configure_firewall() {
     fi
 }
 
-# Function to create systemd service
+# Function to create systemd services
 create_systemd_service() {
-    print_professional "Creating systemd service"
+    print_professional "Creating systemd services"
     
-    # Create service file
-    sudo tee "/etc/systemd/system/$SERVICE_NAME.service" > /dev/null <<EOF
+    # Create backend service file
+    sudo tee "/etc/systemd/system/$SERVICE_NAME-backend.service" > /dev/null <<EOF
 [Unit]
-Description=Music-U-Scheduler Web Application
-After=network.target
+Description=Music-U-Scheduler Backend API
+After=network.target postgresql.service
 Wants=network.target
 
 [Service]
@@ -351,23 +466,75 @@ User=$USER
 Group=$USER
 WorkingDirectory=$INSTALL_DIR
 Environment=PATH=$INSTALL_DIR/venv/bin
-ExecStart=$INSTALL_DIR/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port $APP_PORT
+ExecStart=$INSTALL_DIR/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=$SERVICE_NAME
+SyslogIdentifier=$SERVICE_NAME-backend
 
 [Install]
 WantedBy=multi-user.target
 EOF
     
-    # Reload systemd and enable service
+    # Create frontend service file
+    if [ -d "$INSTALL_DIR/frontend" ]; then
+        sudo tee "/etc/systemd/system/$SERVICE_NAME-frontend.service" > /dev/null <<EOF
+[Unit]
+Description=Music-U-Scheduler Frontend
+After=network.target $SERVICE_NAME-backend.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=$USER
+Group=$USER
+WorkingDirectory=$INSTALL_DIR/frontend
+Environment=PATH=/usr/local/nvm/versions/node/v22.14.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=production
+ExecStart=/usr/local/nvm/versions/node/v22.14.0/bin/yarn start
+ExecReload=/bin/kill -HUP \$MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=$SERVICE_NAME-frontend
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    fi
+    
+    # Create main service that manages both
+    sudo tee "/etc/systemd/system/$SERVICE_NAME.service" > /dev/null <<EOF
+[Unit]
+Description=Music-U-Scheduler Full Stack Application
+After=network.target postgresql.service
+Wants=network.target
+Requires=$SERVICE_NAME-backend.service
+$([ -d "$INSTALL_DIR/frontend" ] && echo "Requires=$SERVICE_NAME-frontend.service")
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecReload=/bin/systemctl reload $SERVICE_NAME-backend.service
+$([ -d "$INSTALL_DIR/frontend" ] && echo "ExecReload=/bin/systemctl reload $SERVICE_NAME-frontend.service")
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Reload systemd and enable services
     sudo systemctl daemon-reload
+    sudo systemctl enable "$SERVICE_NAME-backend"
+    if [ -d "$INSTALL_DIR/frontend" ]; then
+        sudo systemctl enable "$SERVICE_NAME-frontend"
+    fi
     sudo systemctl enable "$SERVICE_NAME"
     
-    print_success "Systemd service created and enabled"
+    print_success "Systemd services created and enabled"
 }
 
 # Function to create update mechanism
@@ -510,36 +677,89 @@ echo "Music-U-Scheduler Professional Setup"
 echo "===================================="
 echo
 echo "Web Interface: https://$DOMAIN"
-echo "Service Status: \$(sudo systemctl is-active $SERVICE_NAME)"
+echo "Backend Status: \$(sudo systemctl is-active $SERVICE_NAME-backend 2>/dev/null || echo 'inactive')"
+echo "Frontend Status: \$(sudo systemctl is-active $SERVICE_NAME-frontend 2>/dev/null || echo 'inactive')"
+echo "PostgreSQL Status: \$(sudo systemctl is-active postgresql 2>/dev/null || echo 'inactive')"
 echo
 echo "Available commands:"
-echo "  start   - Start the service"
-echo "  stop    - Stop the service"
-echo "  restart - Restart the service"
-echo "  status  - Show service status"
-echo "  logs    - Show service logs"
-echo "  update  - Check for updates"
-echo "  open    - Open web interface"
+echo "  start     - Start all services"
+echo "  stop      - Stop all services"
+echo "  restart   - Restart all services"
+echo "  status    - Show service status"
+echo "  logs      - Show service logs"
+echo "  backend   - Manage backend only"
+echo "  frontend  - Manage frontend only"
+echo "  update    - Check for updates"
+echo "  open      - Open web interface"
+echo "  setup-db  - Setup database"
 echo
 
 case "\$1" in
     start)
+        sudo systemctl start postgresql
+        sudo systemctl start $SERVICE_NAME-backend
+        [ -d "$INSTALL_DIR/frontend" ] && sudo systemctl start $SERVICE_NAME-frontend
         sudo systemctl start $SERVICE_NAME
-        echo "Service started"
+        echo "All services started"
         ;;
     stop)
         sudo systemctl stop $SERVICE_NAME
-        echo "Service stopped"
+        [ -d "$INSTALL_DIR/frontend" ] && sudo systemctl stop $SERVICE_NAME-frontend
+        sudo systemctl stop $SERVICE_NAME-backend
+        echo "All services stopped"
         ;;
     restart)
+        sudo systemctl restart postgresql
+        sudo systemctl restart $SERVICE_NAME-backend
+        [ -d "$INSTALL_DIR/frontend" ] && sudo systemctl restart $SERVICE_NAME-frontend
         sudo systemctl restart $SERVICE_NAME
-        echo "Service restarted"
+        echo "All services restarted"
         ;;
     status)
-        sudo systemctl status $SERVICE_NAME
+        echo "=== Service Status ==="
+        sudo systemctl status postgresql --no-pager -l
+        sudo systemctl status $SERVICE_NAME-backend --no-pager -l
+        [ -d "$INSTALL_DIR/frontend" ] && sudo systemctl status $SERVICE_NAME-frontend --no-pager -l
         ;;
     logs)
-        sudo journalctl -u $SERVICE_NAME -f
+        echo "=== Backend Logs ==="
+        sudo journalctl -u $SERVICE_NAME-backend -n 20 --no-pager
+        if [ -d "$INSTALL_DIR/frontend" ]; then
+            echo "=== Frontend Logs ==="
+            sudo journalctl -u $SERVICE_NAME-frontend -n 20 --no-pager
+        fi
+        ;;
+    backend)
+        case "\$2" in
+            start) sudo systemctl start $SERVICE_NAME-backend ;;
+            stop) sudo systemctl stop $SERVICE_NAME-backend ;;
+            restart) sudo systemctl restart $SERVICE_NAME-backend ;;
+            status) sudo systemctl status $SERVICE_NAME-backend ;;
+            logs) sudo journalctl -u $SERVICE_NAME-backend -f ;;
+            *) echo "Usage: \$0 backend {start|stop|restart|status|logs}" ;;
+        esac
+        ;;
+    frontend)
+        if [ -d "$INSTALL_DIR/frontend" ]; then
+            case "\$2" in
+                start) sudo systemctl start $SERVICE_NAME-frontend ;;
+                stop) sudo systemctl stop $SERVICE_NAME-frontend ;;
+                restart) sudo systemctl restart $SERVICE_NAME-frontend ;;
+                status) sudo systemctl status $SERVICE_NAME-frontend ;;
+                logs) sudo journalctl -u $SERVICE_NAME-frontend -f ;;
+                *) echo "Usage: \$0 frontend {start|stop|restart|status|logs}" ;;
+            esac
+        else
+            echo "Frontend not installed"
+        fi
+        ;;
+    setup-db)
+        echo "Setting up PostgreSQL database..."
+        sudo systemctl start postgresql
+        sudo -u postgres createdb music_u_scheduler 2>/dev/null || echo "Database may already exist"
+        sudo -u postgres psql -c "CREATE USER music_u_user WITH PASSWORD 'music_u_password';" 2>/dev/null || echo "User may already exist"
+        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE music_u_scheduler TO music_u_user;" 2>/dev/null
+        echo "Database setup complete"
         ;;
     update)
         $INSTALL_DIR/scripts/update.sh
@@ -548,7 +768,7 @@ case "\$1" in
         xdg-open https://$DOMAIN 2>/dev/null || echo "Please open https://$DOMAIN in your browser"
         ;;
     *)
-        echo "Usage: \$0 {start|stop|restart|status|logs|update|open}"
+        echo "Usage: \$0 {start|stop|restart|status|logs|backend|frontend|update|open|setup-db}"
         echo "Or run without arguments to see this help"
         ;;
 esac
@@ -580,6 +800,27 @@ post_install_setup() {
     print_success "Post-installation setup completed"
 }
 
+# Function to setup PostgreSQL database
+setup_postgresql() {
+    print_professional "Setting up PostgreSQL database..."
+    
+    # Start and enable PostgreSQL
+    sudo systemctl start postgresql
+    sudo systemctl enable postgresql
+    
+    # Wait for PostgreSQL to start
+    sleep 2
+    
+    # Create database and user
+    print_status "Creating database and user..."
+    sudo -u postgres createdb music_u_scheduler 2>/dev/null || print_warning "Database may already exist"
+    sudo -u postgres psql -c "CREATE USER music_u_user WITH PASSWORD 'music_u_password';" 2>/dev/null || print_warning "User may already exist"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE music_u_scheduler TO music_u_user;" 2>/dev/null
+    sudo -u postgres psql -c "ALTER USER music_u_user CREATEDB;" 2>/dev/null
+    
+    print_success "PostgreSQL database setup complete"
+}
+
 # Function to start services
 start_services() {
     print_professional "Starting services..."
@@ -588,17 +829,34 @@ start_services() {
     sudo systemctl start nginx
     sudo systemctl enable nginx
     
-    # Start the application service
+    # Start PostgreSQL
+    sudo systemctl start postgresql
+    
+    # Start backend service
+    sudo systemctl start "$SERVICE_NAME-backend"
+    
+    # Start frontend service if it exists
+    if [ -d "$INSTALL_DIR/frontend" ]; then
+        sudo systemctl start "$SERVICE_NAME-frontend"
+    fi
+    
+    # Start main service
     sudo systemctl start "$SERVICE_NAME"
     
     # Wait a moment for services to start
-    sleep 3
+    sleep 5
     
     # Check service status
-    if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
-        print_success "Music-U-Scheduler service is running"
+    if sudo systemctl is-active --quiet "$SERVICE_NAME-backend"; then
+        print_success "Music-U-Scheduler backend is running"
     else
-        print_warning "Service may not have started properly. Check logs with: sudo journalctl -u $SERVICE_NAME"
+        print_warning "Backend service may not have started properly. Check logs with: sudo journalctl -u $SERVICE_NAME-backend"
+    fi
+    
+    if [ -d "$INSTALL_DIR/frontend" ] && sudo systemctl is-active --quiet "$SERVICE_NAME-frontend"; then
+        print_success "Music-U-Scheduler frontend is running"
+    elif [ -d "$INSTALL_DIR/frontend" ]; then
+        print_warning "Frontend service may not have started properly. Check logs with: sudo journalctl -u $SERVICE_NAME-frontend"
     fi
     
     if sudo systemctl is-active --quiet nginx; then
@@ -617,7 +875,11 @@ show_final_instructions() {
     echo
     echo "🌐 Web Interface: https://$DOMAIN"
     echo "📁 Installation Directory: $INSTALL_DIR"
-    echo "🔧 Service Name: $SERVICE_NAME"
+    echo "🔧 Backend Service: $SERVICE_NAME-backend"
+    if [ -d "$INSTALL_DIR/frontend" ]; then
+        echo "🎨 Frontend Service: $SERVICE_NAME-frontend"
+    fi
+    echo "🗄️  Database: PostgreSQL (music_u_scheduler)"
     echo "🔄 Auto-updates: Enabled (daily check)"
     echo "🔒 SSL/HTTPS: Self-signed certificate"
     echo "🛡️  Reverse Proxy: Nginx"
@@ -641,6 +903,14 @@ show_final_instructions() {
     echo "  Private Key: $SSL_DIR/private.key"
     echo "  Note: Browser will show security warning for self-signed certificate"
     echo
+    echo "Default Login Credentials:"
+    echo "  Username: admin"
+    echo "  Password: MusicU2025"
+    echo
+    echo "API Documentation:"
+    echo "  FastAPI Docs: https://$DOMAIN/docs"
+    echo "  Backend API: https://$DOMAIN/api/"
+    echo
     print_success "🎵 Professional Music-U-Scheduler is ready!"
     print_professional "Access your application at: https://$DOMAIN"
 }
@@ -661,11 +931,20 @@ main() {
         install_dependencies
     fi
     
+    # Install Node.js and Yarn for frontend
+    install_nodejs_yarn
+    
     # Handle existing installation or clone fresh
     handle_existing_installation
     
     # Setup Python environment
     setup_python_environment
+    
+    # Setup frontend environment
+    setup_frontend_environment
+    
+    # Setup PostgreSQL database
+    setup_postgresql
     
     # Professional setup
     setup_custom_domain
