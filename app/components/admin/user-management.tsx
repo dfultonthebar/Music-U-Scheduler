@@ -27,6 +27,7 @@ export default function UserManagement() {
     password: '',
     first_name: '',
     last_name: '',
+    phone: '',
     role: 'student'
   });
 
@@ -66,6 +67,7 @@ export default function UserManagement() {
         password: '',
         first_name: '',
         last_name: '',
+        phone: '',
         role: 'student'
       });
       toast.success(`${createFormData.role === 'instructor' ? 'Instructor' : 'Student'} created successfully`);
@@ -207,6 +209,19 @@ export default function UserManagement() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right">
+                  Phone
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={createFormData.phone || ''}
+                  onChange={(e) => setCreateFormData({...createFormData, phone: e.target.value})}
+                  className="col-span-3"
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="password" className="text-right">
                   Password
                 </Label>
@@ -285,6 +300,9 @@ export default function UserManagement() {
                     <div>
                       <p className="font-medium text-gray-900">{instructor.first_name} {instructor.last_name}</p>
                       <p className="text-sm text-gray-500">{instructor.email}</p>
+                      {instructor.phone && (
+                        <p className="text-sm text-gray-500">{instructor.phone}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -364,6 +382,9 @@ export default function UserManagement() {
                     <div>
                       <p className="font-medium text-gray-900">{student.first_name} {student.last_name}</p>
                       <p className="text-sm text-gray-500">{student.email}</p>
+                      {student.phone && (
+                        <p className="text-sm text-gray-500">{student.phone}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

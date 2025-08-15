@@ -6,6 +6,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
+  phone?: string;
   role: 'admin' | 'instructor' | 'student';
   is_active: boolean;
   created_at: string;
@@ -29,6 +30,7 @@ export interface RegisterData {
   password: string;
   first_name: string;
   last_name: string;
+  phone?: string;
   role?: string;
 }
 
@@ -106,6 +108,7 @@ export interface CreateUserData {
   password: string;
   first_name: string;
   last_name: string;
+  phone?: string;
   role: 'instructor' | 'student';
   full_name?: string;
   is_instructor?: boolean;
