@@ -1,4 +1,15 @@
 
+// Forward declaration for InstructorRole
+interface InstructorRoleRef {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  is_custom?: boolean;
+  created_by?: string;
+  created_at?: string;
+}
+
 // Core types for the Music-U-Scheduler application
 export interface User {
   id: string;
@@ -11,6 +22,7 @@ export interface User {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  assigned_roles?: InstructorRoleRef[];
 }
 
 export interface AuthResponse {

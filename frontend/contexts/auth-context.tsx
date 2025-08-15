@@ -39,8 +39,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await apiService.login(credentials);
       setUser(response.user);
       
-      // Redirect based on role
-      if (response.user.role === 'admin') {
+      // Check if instructor has admin privileges
+      const hasAdminPrivileges = response.user.role === 'admin' || 
+        response.user.assigned_roles?.some((role: any) => 
+          role.permissions?.includes('admin_access'));
+      
+      const isInstructor = response.user.role === 'instructor' ||
+        response.user.assigned_roles?.some((role: any) => 
+          role.permissions?.some((perm: string) => perm.startsWith('teach_')));
+      
+      // Redirect based on role and privileges
+      if (hasAdminPrivileges && isInstructor) {
+        // User has both instructor and admin privileges, show role selection
+        router.push('/role-selection');
+      } else if (response.user.role === 'admin') {
         router.push('/admin');
       } else if (response.user.role === 'instructor') {
         router.push('/instructor');

@@ -2,10 +2,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { 
@@ -24,7 +26,9 @@ import {
   Database,
   GitBranch,
   UserPlus,
-  GraduationCap
+  GraduationCap,
+  RotateCcw,
+  ChevronDown
 } from 'lucide-react';
 import { DashboardStats, User, Lesson, AuditLog } from '@/lib/types';
 import { toast } from 'sonner';
@@ -36,12 +40,29 @@ import GitHubUpdates from './github-updates';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Check if user can switch to instructor role
+  const canSwitchToInstructor = () => {
+    return user?.role === 'instructor' ||
+           user?.assigned_roles?.some((role: any) => 
+             role.permissions?.some((perm: string) => perm.startsWith('teach_')));
+  };
+
+  const handleRoleSwitch = (role: 'instructor' | 'role-selection') => {
+    if (role === 'instructor') {
+      router.push('/instructor');
+    } else {
+      router.push('/role-selection');
+    }
+    toast.success(`Switched to ${role} view`);
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -120,6 +141,31 @@ export default function AdminDashboard() {
               <p className="text-sm font-medium text-gray-900">{user?.first_name} {user?.last_name}</p>
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
+            
+            {/* Role Switch Dropdown (only if user can switch to instructor) */}
+            {canSwitchToInstructor() && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4" />
+                    Switch Role
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => handleRoleSwitch('instructor')}>
+                    <GraduationCap className="w-4 h-4 mr-2" />
+                    Switch to Instructor
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleRoleSwitch('role-selection')}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Role Selection
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            
             <Button
               variant="outline"
               size="sm"

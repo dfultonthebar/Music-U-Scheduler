@@ -2,10 +2,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { 
@@ -20,19 +22,39 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Settings,
+  RotateCcw,
+  ChevronDown
 } from 'lucide-react';
 import { Lesson, Student, Instructor } from '@/lib/types';
 import { toast } from 'sonner';
 
 export default function InstructorDashboard() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [profile, setProfile] = useState<Instructor | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Check if user can switch to admin role
+  const canSwitchToAdmin = () => {
+    return user?.role === 'admin' || 
+           user?.assigned_roles?.some((role: any) => 
+             role.permissions?.includes('admin_access'));
+  };
+
+  const handleRoleSwitch = (role: 'admin' | 'role-selection') => {
+    if (role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/role-selection');
+    }
+    toast.success(`Switched to ${role} view`);
+  };
 
   useEffect(() => {
     loadInstructorData();
@@ -101,6 +123,31 @@ export default function InstructorDashboard() {
               <p className="text-sm font-medium text-gray-900">{user?.first_name} {user?.last_name}</p>
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
+            
+            {/* Role Switch Dropdown (only if user can switch to admin) */}
+            {canSwitchToAdmin() && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4" />
+                    Switch Role
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => handleRoleSwitch('admin')}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Switch to Admin
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleRoleSwitch('role-selection')}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Role Selection
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            
             <Button
               variant="outline"
               size="sm"
