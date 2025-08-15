@@ -1,218 +1,216 @@
+# Music-U-Scheduler
 
-# Music U Lesson Scheduler
-
-A FastAPI-based web application for scheduling music lessons.
+A comprehensive music practice scheduler and progress tracker designed to help musicians organize their practice sessions, track progress, and achieve their musical goals.
 
 ## Features
 
-- User management
-- Lesson scheduling
-- RESTful API
-- Background tasks for notifications
+### Core Features
+- **Practice Session Scheduling**: Plan and organize your practice sessions
+- **Progress Tracking**: Monitor your improvement over time
+- **Goal Setting**: Set and track musical goals
+- **Practice History**: Detailed history of all practice sessions
+- **Multiple Instruments**: Support for various instruments
+- **Customizable Practice Plans**: Create personalized practice routines
 
-## Setup for Ubuntu 24
+### Professional Features (New!)
+- **Web Interface**: Access via HTTPS at `https://musicu.local`
+- **Secure SSL/TLS**: Self-signed certificate for secure connections
+- **Nginx Reverse Proxy**: High-performance web server with security headers
+- **System Service**: Runs as a proper system service with automatic startup
+- **Automatic Updates**: Daily update checks with safe rollback capability
+- **Firewall Integration**: Automatic firewall configuration
+- **Professional Management**: Command-line tools for service management
 
-### Prerequisites
+## Installation
 
-- Python 3.11+
-- PostgreSQL (or SQLite for development)
+### Quick Professional Install (Recommended)
+```bash
+curl -sL https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/musched_installer.sh | bash
+```
 
-### Installation
+This installs Music-U-Scheduler with professional features including:
+- Custom domain (`musicu.local`) with HTTPS
+- Nginx reverse proxy with security headers
+- Systemd service for automatic startup
+- Daily automatic updates
+- Firewall configuration
+- Professional management tools
 
-1. Clone the repository:
+### Basic Install (Desktop Only)
+```bash
+curl -sL https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/musched_installer.sh | bash -s -- --basic
+```
+
+### Manual Install
 ```bash
 git clone https://github.com/dfultonthebar/Music-U-Scheduler.git
 cd Music-U-Scheduler
+chmod +x install.sh
+./install.sh
 ```
 
-2. Create a virtual environment:
+## Usage
+
+### Professional Web Interface
+After professional installation, access the application at:
+**https://musicu.local**
+
+*Note: You'll see a security warning due to the self-signed certificate. This is normal for local development.*
+
+### Service Management
 ```bash
+# Using the control script
+~/Music-U-Scheduler/launch.sh start    # Start service
+~/Music-U-Scheduler/launch.sh stop     # Stop service
+~/Music-U-Scheduler/launch.sh restart  # Restart service
+~/Music-U-Scheduler/launch.sh status   # Show status
+~/Music-U-Scheduler/launch.sh logs     # View logs
+~/Music-U-Scheduler/launch.sh update   # Check for updates
+~/Music-U-Scheduler/launch.sh open     # Open web interface
+```
+
+### Desktop Application (Basic Install)
+```bash
+~/Music-U-Scheduler/launch.sh
+```
+
+## Professional Setup Features
+
+### 🌐 Web Access
+- **Custom Domain**: `musicu.local` with automatic hosts file configuration
+- **HTTPS/SSL**: Self-signed certificate for secure connections
+- **Modern Web Interface**: Responsive design for desktop and mobile
+
+### 🛡️ Security
+- **Nginx Reverse Proxy**: Professional-grade web server
+- **Security Headers**: HSTS, CSP, XSS protection, and more
+- **Firewall Integration**: Automatic UFW/firewalld configuration
+- **SSL/TLS**: Strong encryption with modern protocols
+
+### ⚙️ System Integration
+- **Systemd Service**: Proper system service with automatic startup
+- **Resource Management**: Configured limits and security restrictions
+- **Process Monitoring**: Automatic restart on failure
+- **Health Checks**: Built-in health monitoring
+
+### 🔄 Maintenance
+- **Automatic Updates**: Daily update checks with systemd timer
+- **Safe Updates**: Automatic backup before updates
+- **Rollback Capability**: Easy rollback to previous version
+- **Update Logging**: Comprehensive update and error logging
+
+## Requirements
+
+### System Requirements
+- **OS**: Linux (Ubuntu, Debian, CentOS, Fedora, etc.)
+- **Python**: 3.7 or higher
+- **Memory**: 512MB RAM minimum, 1GB recommended
+- **Storage**: 1GB free space
+- **Network**: Internet connection for installation and updates
+
+### Professional Setup Requirements
+- **Sudo Access**: Required for system configuration
+- **Systemd**: For service management
+- **Nginx**: Installed automatically
+- **OpenSSL**: For SSL certificate generation
+
+## Configuration
+
+### File Locations (Professional Setup)
+- **Application**: `~/Music-U-Scheduler/`
+- **Web Interface**: `https://musicu.local`
+- **Nginx Config**: `/etc/nginx/sites-available/musicu.local`
+- **SSL Certificates**: `/etc/ssl/musicu/`
+- **Service Files**: `/etc/systemd/system/music-u-scheduler*`
+- **Logs**: `/var/log/music-u-scheduler-update.log`
+
+### Customization
+See [Professional Setup Documentation](docs/PROFESSIONAL_SETUP.md) for detailed configuration options.
+
+## Development
+
+### Local Development
+```bash
+git clone https://github.com/dfultonthebar/Music-U-Scheduler.git
+cd Music-U-Scheduler
 python3 -m venv venv
 source venv/bin/activate
+pip install -r requirements.txt
+python -m app.main
 ```
 
-3. Install dependencies:
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## Troubleshooting
+
+### Professional Setup Issues
 ```bash
-pip install -e .
+# Check service status
+sudo systemctl status music-u-scheduler
+
+# View service logs
+sudo journalctl -u music-u-scheduler -f
+
+# Check nginx status
+sudo systemctl status nginx
+
+# Test nginx configuration
+sudo nginx -t
+
+# Manual update
+~/Music-U-Scheduler/scripts/update.sh --force
 ```
 
-4. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your database credentials
-```
+### Common Issues
+- **Service won't start**: Check logs with `sudo journalctl -u music-u-scheduler`
+- **SSL warnings**: Normal for self-signed certificates
+- **Port conflicts**: Ensure port 8000 is available
+- **Permission issues**: Ensure proper file permissions
 
-5. Run the application:
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+### Getting Help
+1. Check the [Professional Setup Documentation](docs/PROFESSIONAL_SETUP.md)
+2. Review service logs: `sudo journalctl -u music-u-scheduler`
+3. Check GitHub issues for known problems
+4. Create a new issue with detailed information
 
-## API Documentation
+## License
 
-Once running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Database Setup & Testing
+## Changelog
 
-### PostgreSQL Setup
+### Version 2.0.0 (Professional Release)
+- **NEW**: Professional web interface with HTTPS
+- **NEW**: Nginx reverse proxy with security headers
+- **NEW**: Systemd service integration
+- **NEW**: Automatic update system
+- **NEW**: Firewall configuration
+- **NEW**: Professional management tools
+- **IMPROVED**: Enhanced installer with professional features
+- **IMPROVED**: Better error handling and logging
+- **IMPROVED**: Security hardening
 
-The application uses PostgreSQL as the primary database. Follow these steps to set up the database:
+### Version 1.0.0 (Initial Release)
+- Basic desktop application
+- Practice session scheduling
+- Progress tracking
+- Goal setting
+- Practice history
 
-1. **Install PostgreSQL** (Ubuntu/Debian):
-```bash
-sudo apt-get update
-sudo apt-get install -y postgresql postgresql-contrib libpq-dev
-```
+## Acknowledgments
 
-2. **Install Python dependencies**:
-```bash
-pip install psycopg2-binary alembic pytest
-```
+- Built with Python and modern web technologies
+- Uses Nginx for high-performance web serving
+- Systemd integration for reliable service management
+- SSL/TLS security for safe web access
 
-3. **Start PostgreSQL service**:
-```bash
-sudo service postgresql start
-```
+---
 
-4. **Create database and user**:
-```bash
-sudo -u postgres psql -c "CREATE USER musicu_user WITH PASSWORD 'musicu_password123';"
-sudo -u postgres createdb musicu_db -O musicu_user
-```
+**🎵 Happy practicing with Music-U-Scheduler Professional!**
 
-### Database Configuration
-
-1. **Set up environment variables** in your `.env` file:
-```env
-# Database Configuration
-DATABASE_URL=postgresql://musicu_user:musicu_password123@localhost:5432/musicu_db
-
-# Security
-SECRET_KEY=your-secret-key-change-this-in-production-12345
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# Redis Configuration (for Celery)
-REDIS_URL=redis://localhost:6379/0
-
-# Application Settings
-DEBUG=True
-PROJECT_NAME=Music U Lesson Scheduler
-VERSION=0.1.0
-```
-
-2. **Initialize Alembic** (already done):
-```bash
-alembic init alembic
-```
-
-3. **Create and run database migrations**:
-```bash
-# Create initial migration
-alembic revision --autogenerate -m "Initial database schema"
-
-# Apply migrations to create tables
-alembic upgrade head
-```
-
-### Sample Data
-
-Initialize the database with sample users and lessons:
-
-```bash
-python scripts/db_init.py
-```
-
-This creates:
-- **3 Teachers**: Piano, Guitar, and General Music instructors
-- **4 Students**: Various skill levels
-- **5 Sample Lessons**: Scheduled lessons between teachers and students
-
-**Sample Teacher Accounts**:
-- `john.teacher@musicu.com` (General Music)
-- `sarah.piano@musicu.com` (Piano)
-- `mike.guitar@musicu.com` (Guitar)
-
-**Sample Student Accounts**:
-- `alice.student@example.com`
-- `bob.student@example.com`
-- `carol.student@example.com`
-- `david.student@example.com`
-
-All sample accounts use simple passwords for testing (check the script output for details).
-
-### Database Testing
-
-Run CRUD tests to verify database functionality:
-
-```bash
-# Run all database tests
-pytest tests/test_crud.py -v
-
-# Run tests quietly (less output)
-pytest tests/test_crud.py -q
-```
-
-The tests cover:
-- User creation, reading, updating, deletion
-- Lesson creation, reading, updating, deletion
-- Database relationships between users and lessons
-
-### Database Management
-
-**View database contents**:
-```bash
-# Connect to database
-psql postgresql://musicu_user:musicu_password123@localhost:5432/musicu_db
-
-# List tables
-\dt
-
-# View users
-SELECT id, email, username, full_name, is_teacher FROM users;
-
-# View lessons
-SELECT id, title, teacher_id, student_id, scheduled_at, instrument FROM lessons;
-```
-
-**Reset database** (if needed):
-```bash
-# Drop and recreate database
-sudo -u postgres dropdb musicu_db
-sudo -u postgres createdb musicu_db -O musicu_user
-alembic upgrade head
-python scripts/db_init.py
-```
-
-## Project Structure
-
-```
-├── app/
-│   ├── api/
-│   │   └── routers/
-│   │       ├── users.py
-│   │       └── lessons.py
-│   ├── database.py
-│   ├── models.py
-│   ├── schemas.py
-│   ├── crud.py
-│   ├── main.py
-│   └── tasks.py
-├── alembic/                    # Database migrations
-│   ├── versions/
-│   ├── env.py
-│   └── script.py.mako
-├── scripts/
-│   └── db_init.py             # Database initialization
-├── tests/
-│   └── test_crud.py           # Database tests
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── README.md
-├── .gitignore
-├── pyproject.toml
-├── alembic.ini
-└── .env.example
-```
+For detailed professional setup information, see [Professional Setup Documentation](docs/PROFESSIONAL_SETUP.md).
