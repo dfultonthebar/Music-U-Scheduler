@@ -26,35 +26,45 @@ export default function LoginForm() {
     setError('');
     setIsLoading(true);
     
-    console.log('Form submitted with credentials:', { username: credentials.username });
+    console.log('Form submitted with credentials:', { username: credentials.username, password: '***' });
     
     try {
-      // Use NextAuth's built-in redirect functionality
       const redirectUrl = credentials.username === 'admin' ? '/admin' : '/dashboard';
       
       const result = await signIn('credentials', {
         username: credentials.username,
         password: credentials.password,
         callbackUrl: redirectUrl,
-        redirect: true  // Let NextAuth handle the redirect
+        redirect: false  // Handle redirect manually for better control
       });
 
-      // This code should not execute if redirect: true works
       console.log('SignIn result:', result);
 
       if (result?.error) {
         console.error('Login error from NextAuth:', result.error);
         setError(`Login failed: ${result.error}`);
         toast.error('Invalid username or password');
-        setIsLoading(false);
+      } else if (result?.ok && result?.url) {
+        console.log('Authentication successful, redirecting to:', result.url);
+        toast.success('Login successful!');
+        // Use router.push for client-side navigation
+        window.location.href = result.url;
+      } else if (result?.ok) {
+        console.log('Authentication successful, redirecting to:', redirectUrl);
+        toast.success('Login successful!');
+        window.location.href = redirectUrl;
+      } else {
+        console.log('Unexpected result:', result);
+        setError('Login failed - unexpected response');
+        toast.error('Login failed');
       }
     } catch (error) {
       console.error('Login error:', error);
       setError('Login failed. Please try again.');
       toast.error('Login failed');
+    } finally {
       setIsLoading(false);
     }
-    // Don't set loading to false here since we're redirecting
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
