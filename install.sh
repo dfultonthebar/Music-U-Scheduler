@@ -127,14 +127,29 @@ log "Setting up Python backend environment..."
 # Create virtual environment if it doesn't exist
 if [ ! -d "music-u-env" ]; then
     log "Creating Python virtual environment..."
+    # Install python3-venv if not available
+    if ! python3 -m venv --help >/dev/null 2>&1; then
+        log "Installing python3-venv..."
+        sudo apt update && sudo apt install -y python3-venv python3-full
+    fi
     python3 -m venv music-u-env
+    log "Virtual environment created successfully"
 fi
 
 # Activate virtual environment
+log "Activating virtual environment..."
 source music-u-env/bin/activate
 
-# Upgrade pip
-log "Upgrading pip..."
+# Verify we're in the virtual environment
+if [[ "$VIRTUAL_ENV" != "" ]]; then
+    log "Virtual environment activated: $VIRTUAL_ENV"
+else
+    error "Failed to activate virtual environment"
+    exit 1
+fi
+
+# Upgrade pip in virtual environment
+log "Upgrading pip in virtual environment..."
 pip install --upgrade pip
 
 # Install backend requirements
