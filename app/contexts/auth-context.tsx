@@ -14,6 +14,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
+  displayName: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,6 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
   }, []);
 
+  const displayName = user ? `${user.first_name} ${user.last_name}`.trim() : '';
+
   const value = {
     user,
     loading,
@@ -93,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     refreshUser,
     isAuthenticated: !!user,
+    displayName,
   };
 
   return (

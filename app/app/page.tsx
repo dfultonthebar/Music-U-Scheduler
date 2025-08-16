@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { Loader2, Music } from 'lucide-react';
 
