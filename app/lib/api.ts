@@ -20,8 +20,9 @@ import {
   InstructorWithRoles,
   PromoteToAdminData
 } from './types';
+import { getSession } from 'next-auth/react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 class APIError extends Error {
   constructor(public status: number, message: string) {
@@ -32,55 +33,24 @@ class APIError extends Error {
 
 class APIService {
   private token: string | null = null;
-  private mockUsers: User[] = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = localStorage.getItem('backend_auth_token');
     }
-    this.initializeMockData();
-  }
-
-  private initializeMockData() {
-    this.mockUsers = [
-      {
-        id: 'user-1',
-        username: 'john_instructor',
-        email: 'john@example.com',
-        first_name: 'John',
-        last_name: 'Smith',
-        phone: '(555) 123-4567',
-        role: 'instructor',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: 'user-2',
-        username: 'jane_instructor',
-        email: 'jane@example.com',
-        first_name: 'Jane',
-        last_name: 'Doe',
-        phone: '(555) 987-6543',
-        role: 'instructor',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ];
   }
 
   setToken(token: string) {
     this.token = token;
     if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem('backend_auth_token', token);
     }
   }
 
   clearToken() {
     this.token = null;
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('backend_auth_token');
     }
   }
 
@@ -94,6 +64,7 @@ class APIService {
       ...((options.headers as Record<string, string>) || {}),
     };
 
+    // Add backend JWT token if available
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
@@ -120,64 +91,19 @@ class APIService {
 
   // Authentication endpoints
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    // Handle default admin account
-    if (credentials.username === 'admin' && credentials.password === 'MusicU2025') {
-      const defaultAdminResponse: AuthResponse = {
-        access_token: 'default_admin_token_' + Date.now(),
-        token_type: 'bearer',
-        user: {
-          id: 'admin-1',
-          username: 'admin',
-          email: 'admin@musicu.local',
-          first_name: 'System',
-          last_name: 'Administrator',
-          role: 'admin',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-      };
-      this.setToken(defaultAdminResponse.access_token);
-      return defaultAdminResponse;
-    }
+    // Authenticate with backend
+    const formData = new FormData();
+    formData.append('username', credentials.username);
+    formData.append('password', credentials.password);
 
-    // Try backend authentication first
-    try {
-      const formData = new FormData();
-      formData.append('username', credentials.username);
-      formData.append('password', credentials.password);
+    const response = await this.makeRequest<AuthResponse>('/auth/login', {
+      method: 'POST',
+      headers: {},
+      body: formData,
+    });
 
-      const response = await this.makeRequest<AuthResponse>('/auth/login', {
-        method: 'POST',
-        headers: {},
-        body: formData,
-      });
-
-      this.setToken(response.access_token);
-      return response;
-    } catch (error) {
-      // If backend is not available, check for default credentials as fallback
-      if (credentials.username === 'admin' && credentials.password === 'MusicU2025') {
-        const defaultAdminResponse: AuthResponse = {
-          access_token: 'default_admin_token_' + Date.now(),
-          token_type: 'bearer',
-          user: {
-            id: 'admin-1',
-            username: 'admin',
-            email: 'admin@musicu.local',
-            first_name: 'System',
-            last_name: 'Administrator',
-            role: 'admin',
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-        };
-        this.setToken(defaultAdminResponse.access_token);
-        return defaultAdminResponse;
-      }
-      throw error;
-    }
+    this.setToken(response.access_token);
+    return response;
   }
 
   async register(data: RegisterData): Promise<User> {
@@ -188,21 +114,6 @@ class APIService {
   }
 
   async getCurrentUser(): Promise<User> {
-    // Handle default admin token
-    if (this.token && this.token.startsWith('default_admin_token_')) {
-      return {
-        id: 'admin-1',
-        username: 'admin',
-        email: 'admin@musicu.local',
-        first_name: 'System',
-        last_name: 'Administrator',
-        role: 'admin',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
-    
     return this.makeRequest<User>('/auth/me');
   }
 
@@ -216,72 +127,7 @@ class APIService {
   }
 
   async getAllUsers(): Promise<User[]> {
-    try {
-      return await this.makeRequest<User[]>('/admin/users');
-    } catch (error) {
-      // Fallback mock users for testing
-      return [
-        {
-          id: 'instructor-1',
-          username: 'jsmith',
-          email: 'john.smith@example.com',
-          first_name: 'John',
-          last_name: 'Smith',
-          phone: '(555) 123-4567',
-          role: 'instructor',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 'instructor-2',
-          username: 'mjohnson',
-          email: 'mary.johnson@example.com',
-          first_name: 'Mary',
-          last_name: 'Johnson',
-          phone: '(555) 234-5678',
-          role: 'instructor',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 'student-1',
-          username: 'awilson',
-          email: 'alice.wilson@example.com',
-          first_name: 'Alice',
-          last_name: 'Wilson',
-          phone: '(555) 345-6789',
-          role: 'student',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 'student-2',
-          username: 'blee',
-          email: 'bob.lee@example.com',
-          first_name: 'Bob',
-          last_name: 'Lee',
-          phone: '(555) 456-7890',
-          role: 'student',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 'student-3',
-          username: 'cdavis',
-          email: 'carol.davis@example.com',
-          first_name: 'Carol',
-          last_name: 'Davis',
-          role: 'student',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-      ];
-    }
+    return this.makeRequest<User[]>('/admin/users');
   }
 
   async getAllLessons(): Promise<Lesson[]> {
@@ -347,48 +193,23 @@ class APIService {
       is_instructor: userData.role === 'instructor'
     };
     
-    try {
-      return await this.makeRequest<User>('/admin/users', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-    } catch (error) {
-      // Fallback for testing
-      return {
-        id: 'user-' + Date.now(),
-        username: userData.username,
-        email: userData.email,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        phone: userData.phone,
-        role: userData.role,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    }
+    return await this.makeRequest<User>('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 
   async deleteUser(userId: string): Promise<void> {
-    try {
-      await this.makeRequest(`/admin/users/${userId}`, {
-        method: 'DELETE',
-      });
-    } catch (error) {
-      console.log('Delete user mock - would delete user:', userId);
-    }
+    await this.makeRequest(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
   }
 
   async updateUserRole(userId: string, role: string): Promise<User> {
-    try {
-      return await this.makeRequest<User>(`/admin/users/${userId}/role`, {
-        method: 'PUT',
-        body: JSON.stringify({ role }),
-      });
-    } catch (error) {
-      // Fallback mock response
-      throw new APIError(200, 'Role updated successfully (mock)');
-    }
+    return await this.makeRequest<User>(`/admin/users/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
   }
 
   // Instructor Role Management
