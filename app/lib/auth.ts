@@ -27,28 +27,40 @@ export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       id: "credentials",
-      name: "credentials", 
+      name: "credentials",
       credentials: {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
+        console.log('NextAuth authorize called with:', credentials?.username);
+        
         if (!credentials?.username || !credentials?.password) {
+          console.log('Missing credentials');
           return null
         }
 
         // Check mock database
         const user = mockUsers.find(u => u.username === credentials.username)
-        if (user && await bcrypt.compare(credentials.password, user.password)) {
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            username: user.username
+        console.log('Found user:', user ? user.username : 'none');
+        
+        if (user) {
+          const passwordMatch = await bcrypt.compare(credentials.password, user.password);
+          console.log('Password match:', passwordMatch);
+          
+          if (passwordMatch) {
+            console.log('Authentication successful for:', user.username);
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              username: user.username
+            }
           }
         }
 
+        console.log('Authentication failed');
         return null
       }
     })
@@ -58,11 +70,10 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
-    signIn: "/login",
-    error: "/login"
+    signIn: "/login"
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
         token.role = (user as any).role
         token.username = (user as any).username
@@ -77,16 +88,10 @@ export const authOptions: NextAuthOptions = {
       }
       return session
     },
-    async signIn({ user, account, profile }) {
-      return true // Always allow sign in for now
-    },
-    async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) return url
-      return baseUrl
-    },
+    async signIn({ user }) {
+      console.log('SignIn callback - user authenticated:', user?.name);
+      return true
+    }
   },
   secret: process.env.NEXTAUTH_SECRET
 }

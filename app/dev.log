@@ -1,0 +1,118 @@
+
+> dev
+> next dev
+
+  ▲ Next.js 14.2.28
+  - Local:        http://localhost:3000
+  - Environments: .env.local, .env
+  - Experiments (use with caution):
+    · outputFileTracingRoot
+
+ ✓ Starting...
+ ✓ Ready in 1464ms
+ ✓ Compiled /api/auth/[...nextauth] in 446ms (268 modules)
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ POST /api/auth/signin/credentials 302 in 902ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 31ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 23ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 23ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 23ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 22ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 24ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 24ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 230ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 24ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 22ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 16ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 23ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 20ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 18ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 23ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 21ms
+Redirect callback: { url: 'http://localhost:3000', baseUrl: 'http://localhost:3000' }
+ POST /api/auth/signin?csrf=true 302 in 19ms
+ ✓ Compiled in 157ms (268 modules)
+[?25h

@@ -26,25 +26,34 @@ export default function LoginForm() {
     setError('');
     setIsLoading(true);
     
+    console.log('Form submitted with credentials:', { username: credentials.username });
+    
     try {
       const result = await signIn('credentials', {
         username: credentials.username,
         password: credentials.password,
         redirect: false,
+        callbackUrl: credentials.username === 'admin' ? '/admin' : '/dashboard'
       });
 
+      console.log('SignIn result:', result);
+
       if (result?.error) {
-        setError('Invalid username or password');
-        toast.error('Login failed');
+        console.error('Login error from NextAuth:', result.error);
+        setError(`Login failed: ${result.error}`);
+        toast.error('Invalid username or password');
       } else if (result?.ok) {
+        console.log('Login successful, redirecting...');
         toast.success('Login successful!');
         
-        // Redirect based on role - for now, redirect admin to /admin
-        if (credentials.username === 'admin') {
-          router.push('/admin');
-        } else {
-          router.push('/dashboard');
-        }
+        // Use window.location to force a full page redirect
+        const redirectUrl = credentials.username === 'admin' ? '/admin' : '/dashboard';
+        console.log('Redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
+      } else {
+        console.log('Unexpected result:', result);
+        setError('Login failed - unexpected response');
+        toast.error('Login failed');
       }
     } catch (error) {
       console.error('Login error:', error);
