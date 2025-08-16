@@ -46,16 +46,23 @@ A comprehensive music lesson scheduling application built with Next.js (frontend
 ### One-Line Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-username/music-u-scheduler/main/install-fixed.sh | bash
+curl -sSL https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/install.sh | bash
 ```
+
+This installer will:
+- ✅ Automatically clone the repository
+- ✅ Set up Python virtual environment  
+- ✅ Install all backend dependencies
+- ✅ Configure Node.js frontend
+- ✅ Create database and environment files
+- ✅ Generate startup scripts
 
 Or clone and install manually:
 
 ```bash
-git clone https://github.com/your-username/music-u-scheduler.git
-cd music-u-scheduler
-chmod +x install-fixed.sh
-./install-fixed.sh
+git clone https://github.com/dfultonthebar/Music-U-Scheduler.git
+cd Music-U-Scheduler
+./install.sh
 ```
 
 ### Starting the Application
@@ -102,7 +109,7 @@ music-u-scheduler/
 ├── music-u-env/                  # Python virtual environment
 ├── static/                       # Static assets
 ├── logs/                         # Application logs
-├── install-fixed.sh              # Installation script
+├── install.sh                    # Installation script
 ├── start-all.sh                  # Combined startup script
 ├── start-backend.sh              # Backend startup script
 ├── start-frontend.sh             # Frontend startup script
