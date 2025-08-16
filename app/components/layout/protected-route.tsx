@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useAuth } from '@/contexts/auth-context';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -15,30 +15,32 @@ export default function ProtectedRoute({
   children, 
   allowedRoles 
 }: ProtectedRouteProps) {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return; // Still loading
+    if (status === 'loading') return; // Still loading
 
-    if (!isAuthenticated) {
+    if (status === 'unauthenticated' || !session) {
       router.push('/login');
       return;
     }
 
-    if (user && allowedRoles && !allowedRoles.includes(user.role)) {
+    const userRole = (session.user as any)?.role;
+    
+    if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
       // Redirect to appropriate dashboard based on role
-      if (user.role === 'admin') {
+      if (userRole === 'admin') {
         router.push('/admin');
-      } else if (user.role === 'instructor') {
+      } else if (userRole === 'instructor') {
         router.push('/instructor');
       } else {
         router.push('/dashboard');
       }
     }
-  }, [user, loading, isAuthenticated, allowedRoles, router]);
+  }, [session, status, allowedRoles, router]);
 
-  if (loading) {
+  if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -49,11 +51,12 @@ export default function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated) {
+  if (status === 'unauthenticated' || !session) {
     return null;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+  const userRole = (session.user as any)?.role;
+  if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
     return null;
   }
 

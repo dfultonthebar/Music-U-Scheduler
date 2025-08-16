@@ -29,39 +29,32 @@ export default function LoginForm() {
     console.log('Form submitted with credentials:', { username: credentials.username });
     
     try {
+      // Use NextAuth's built-in redirect functionality
+      const redirectUrl = credentials.username === 'admin' ? '/admin' : '/dashboard';
+      
       const result = await signIn('credentials', {
         username: credentials.username,
         password: credentials.password,
-        redirect: false,
-        callbackUrl: credentials.username === 'admin' ? '/admin' : '/dashboard'
+        callbackUrl: redirectUrl,
+        redirect: true  // Let NextAuth handle the redirect
       });
 
+      // This code should not execute if redirect: true works
       console.log('SignIn result:', result);
 
       if (result?.error) {
         console.error('Login error from NextAuth:', result.error);
         setError(`Login failed: ${result.error}`);
         toast.error('Invalid username or password');
-      } else if (result?.ok) {
-        console.log('Login successful, redirecting...');
-        toast.success('Login successful!');
-        
-        // Use window.location to force a full page redirect
-        const redirectUrl = credentials.username === 'admin' ? '/admin' : '/dashboard';
-        console.log('Redirecting to:', redirectUrl);
-        window.location.href = redirectUrl;
-      } else {
-        console.log('Unexpected result:', result);
-        setError('Login failed - unexpected response');
-        toast.error('Login failed');
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Login error:', error);
       setError('Login failed. Please try again.');
       toast.error('Login failed');
-    } finally {
       setIsLoading(false);
     }
+    // Don't set loading to false here since we're redirecting
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

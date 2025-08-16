@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { apiService } from '@/lib/api';
-import { useAuth } from '@/contexts/auth-context';
+import { useSession, signOut } from 'next-auth/react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -39,7 +39,7 @@ import SystemBackupManager from './system-backup';
 import GitHubUpdates from './github-updates';
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuth();
+  const { data: session } = useSession();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -47,6 +47,8 @@ export default function AdminDashboard() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const user = session?.user as any;
 
   // Check if user can switch to instructor role
   const canSwitchToInstructor = () => {
@@ -138,7 +140,7 @@ export default function AdminDashboard() {
           
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{user?.first_name} {user?.last_name}</p>
+              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
             
@@ -169,7 +171,7 @@ export default function AdminDashboard() {
             <Button
               variant="outline"
               size="sm"
-              onClick={logout}
+              onClick={() => signOut({ callbackUrl: '/login' })}
               className="flex items-center gap-2"
             >
               <LogOut className="w-4 h-4" />
