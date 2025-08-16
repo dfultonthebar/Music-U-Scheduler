@@ -91,6 +91,14 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) {
       console.log('SignIn callback - user authenticated:', user?.name);
       return true
+    },
+    async redirect({ url, baseUrl }) {
+      // Allow relative URLs and same-origin URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      // Allow same origin URLs
+      else if (new URL(url).origin === baseUrl) return url
+      // Otherwise redirect to admin page for admin users
+      return `${baseUrl}/admin`
     }
   },
   secret: process.env.NEXTAUTH_SECRET
