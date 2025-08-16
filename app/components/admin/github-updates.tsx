@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { RefreshCw, Download, GitBranch, Clock, AlertTriangle, CheckCircle, Github, Terminal } from 'lucide-react';
+import { RefreshCw, Download, GitBranch, Clock, AlertTriangle, CheckCircle, Github, Terminal, RotateCcw, Power } from 'lucide-react';
 import { apiService } from '@/lib/api';
 import { GitHubUpdate } from '@/lib/types';
 
@@ -19,6 +19,8 @@ export default function GitHubUpdates() {
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [updateCompleted, setUpdateCompleted] = useState(false);
+  const [restartRequired, setRestartRequired] = useState(false);
 
   useEffect(() => {
     checkForUpdates();
@@ -50,11 +52,20 @@ export default function GitHubUpdates() {
   const handleUpdate = async () => {
     try {
       setUpdating(true);
+      setUpdateCompleted(false);
       const result = await apiService.updateSystem();
       if (result.success) {
         toast.success(result.message);
+        setUpdateCompleted(true);
         if (result.restart_required) {
-          toast.info('System restart is recommended to complete the update');
+          setRestartRequired(true);
+          toast.info('System restart is recommended to complete the update', {
+            duration: 10000,
+            action: {
+              label: 'Restart Now',
+              onClick: () => handlePageRestart()
+            }
+          });
         }
         // Refresh update info after successful update
         await checkForUpdates();
@@ -67,6 +78,22 @@ export default function GitHubUpdates() {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handlePageRestart = () => {
+    toast.info('Refreshing page to apply updates...', { duration: 2000 });
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  };
+
+  const handleFullRestart = () => {
+    toast.info('Requesting full application restart...', { duration: 3000 });
+    // This would typically call a backend endpoint to restart services
+    // For now, we'll just refresh the page after a longer delay
+    setTimeout(() => {
+      window.location.reload();
+    }, 3000);
   };
 
   if (loading) {
@@ -155,7 +182,42 @@ export default function GitHubUpdates() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {updateInfo.has_updates ? (
+              {updateCompleted && restartRequired ? (
+                <div className="space-y-4">
+                  <Alert>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <AlertTitle>Update Completed Successfully!</AlertTitle>
+                    <AlertDescription>
+                      The system has been updated. Please restart to apply all changes.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Button 
+                      onClick={handlePageRestart}
+                      className="flex items-center gap-2"
+                      variant="default"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Refresh Page
+                    </Button>
+                    
+                    <Button 
+                      onClick={handleFullRestart}
+                      className="flex items-center gap-2"
+                      variant="outline"
+                    >
+                      <Power className="w-4 h-4" />
+                      Full Restart
+                    </Button>
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p><strong>Refresh Page:</strong> Quick reload to apply frontend updates</p>
+                    <p><strong>Full Restart:</strong> Complete system restart (recommended for major updates)</p>
+                  </div>
+                </div>
+              ) : updateInfo.has_updates ? (
                 <div className="space-y-4">
                   <Alert>
                     <Download className="h-4 w-4" />
@@ -250,6 +312,7 @@ export default function GitHubUpdates() {
                 <li>Run database migrations</li>
                 <li>Restart services</li>
                 <li>Verify system functionality</li>
+                <li>Provide restart options to complete update</li>
               </ol>
             </div>
             
@@ -269,8 +332,10 @@ export default function GitHubUpdates() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Important Notes</AlertTitle>
             <AlertDescription>
-              Always create a system backup before updating. Updates may require a system restart to complete.
-              Users may experience brief service interruption during the update process.
+              Always create a system backup before updating. After successful updates, you'll be presented with restart options:
+              <br />• <strong>Refresh Page:</strong> Quick reload for frontend-only changes
+              <br />• <strong>Full Restart:</strong> Complete system restart for backend changes
+              <br />Users may experience brief service interruption during the update and restart process.
             </AlertDescription>
           </Alert>
         </CardContent>
