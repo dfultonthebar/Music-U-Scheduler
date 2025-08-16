@@ -37,6 +37,8 @@ import RoleManagement from './role-management';
 import EmailSettings from './email-settings';
 import SystemBackupManager from './system-backup';
 import GitHubUpdates from './github-updates';
+import VersionManagement from './version-management';
+import { getVersionString, getCurrentVersion } from '@/lib/version';
 
 export default function AdminDashboard() {
   const { data: session } = useSession();
@@ -47,6 +49,7 @@ export default function AdminDashboard() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [versionString, setVersionString] = useState<string>('');
 
   const user = session?.user as any;
 
@@ -68,6 +71,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    // Load version information
+    setVersionString(getVersionString());
   }, []);
 
   const loadDashboardData = async () => {
@@ -134,7 +139,9 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
-              <p className="text-sm text-gray-500">Music-U-Scheduler</p>
+              <p className="text-sm text-gray-500">
+                Music-U-Scheduler {versionString && <Badge variant="outline" className="ml-2 text-xs">{versionString}</Badge>}
+              </p>
             </div>
           </div>
           
@@ -212,6 +219,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="updates" className="flex items-center gap-2 text-xs lg:text-sm">
               <GitBranch className="w-4 h-4" />
               <span className="hidden sm:inline">Updates</span>
+            </TabsTrigger>
+            <TabsTrigger value="version" className="flex items-center gap-2 text-xs lg:text-sm">
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">Versions</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2 text-xs lg:text-sm">
               <Settings className="w-4 h-4" />
@@ -343,6 +354,11 @@ export default function AdminDashboard() {
           {/* GitHub Updates Tab */}
           <TabsContent value="updates" className="space-y-6">
             <GitHubUpdates />
+          </TabsContent>
+
+          {/* Version Management Tab */}
+          <TabsContent value="version" className="space-y-6">
+            <VersionManagement />
           </TabsContent>
 
           {/* Lessons Tab */}

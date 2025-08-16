@@ -625,3 +625,6 @@ class APIService {
 
 export const apiService = new APIService();
 export { APIError };
+
+// Export alias for backward compatibility
+export { apiService as api };
