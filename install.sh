@@ -1,10 +1,15 @@
 
 #!/bin/bash
 
-# Music U Scheduler - Fixed Installation Script
-# Version: 2.0
-# Date: August 15, 2025
-# Fixes: Yarn permissions, service management, environment setup
+# Music U Scheduler - Installation Script
+# Version: 2.1
+# Date: August 16, 2025  
+# Fixes: ESLint conflicts, virtual environment paths, dependency resolution
+# Key improvements:
+#   - Uses --legacy-peer-deps for npm install to handle ESLint conflicts
+#   - Enhanced virtual environment verification and error handling
+#   - Better frontend dependency conflict resolution
+#   - Improved installation testing and verification
 
 set -e  # Exit on error
 
@@ -124,38 +129,80 @@ sleep 2
 # 3. Backend Setup
 log "Setting up Python backend environment..."
 
+# Clean up any existing problematic virtual environment
+if [ -d "music-u-env" ] && [ ! -f "music-u-env/bin/python" ]; then
+    warning "Removing corrupted virtual environment..."
+    rm -rf music-u-env
+fi
+
 # Create virtual environment if it doesn't exist
 if [ ! -d "music-u-env" ]; then
     log "Creating Python virtual environment..."
     # Install python3-venv if not available
     if ! python3 -m venv --help >/dev/null 2>&1; then
         log "Installing python3-venv..."
-        sudo apt update && sudo apt install -y python3-venv python3-full
+        if command -v sudo >/dev/null 2>&1; then
+            sudo apt update && sudo apt install -y python3-venv python3-full
+        else
+            error "python3-venv not available and cannot install without sudo. Please install python3-venv package."
+            exit 1
+        fi
     fi
-    python3 -m venv music-u-env
+    
+    python3 -m venv music-u-env || {
+        error "Failed to create virtual environment. Check Python installation."
+        exit 1
+    }
     log "Virtual environment created successfully"
+fi
+
+# Verify virtual environment exists and is functional
+if [ ! -f "music-u-env/bin/python" ]; then
+    error "Virtual environment creation failed - python executable not found"
+    exit 1
 fi
 
 # Activate virtual environment
 log "Activating virtual environment..."
 source music-u-env/bin/activate
 
-# Verify we're in the virtual environment
-if [[ "$VIRTUAL_ENV" != "" ]]; then
-    log "Virtual environment activated: $VIRTUAL_ENV"
+# Verify we're in the virtual environment  
+EXPECTED_VENV="$(pwd)/music-u-env"
+if [[ "$VIRTUAL_ENV" == "$EXPECTED_VENV" ]]; then
+    log "Virtual environment activated successfully: $VIRTUAL_ENV"
+elif [[ "$VIRTUAL_ENV" != "" ]]; then
+    warning "Virtual environment path mismatch:"
+    warning "  Expected: $EXPECTED_VENV"
+    warning "  Actual: $VIRTUAL_ENV"
+    warning "Continuing anyway..."
 else
     error "Failed to activate virtual environment"
+    error "Please ensure the virtual environment was created properly"
     exit 1
 fi
 
+# Verify Python and pip locations
+PYTHON_LOC=$(which python)
+PIP_LOC=$(which pip)
+log "Python location: $PYTHON_LOC"
+log "Pip location: $PIP_LOC"
+
 # Upgrade pip in virtual environment
 log "Upgrading pip in virtual environment..."
-pip install --upgrade pip
+pip install --upgrade pip || {
+    error "Failed to upgrade pip in virtual environment"
+    exit 1
+}
 
 # Install backend requirements
 log "Installing Python dependencies..."
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
+    pip install -r requirements.txt || {
+        error "Failed to install Python dependencies"
+        error "Check that all required packages are available for your Python version"
+        exit 1
+    }
+    log "Python dependencies installed successfully"
 else
     error "requirements.txt not found!"
     exit 1
@@ -196,16 +243,16 @@ else
     exit 1
 fi
 
-# Setup package management - Use npm instead of yarn to avoid permission issues
+# Setup package management - Use npm with legacy peer deps to handle ESLint conflicts
 if [ -f "yarn.lock" ] && command -v yarn &> /dev/null; then
     log "Using Yarn for package management..."
     # Check if node_modules exists and is properly linked
     if [ ! -d "node_modules" ] || [ ! -L "node_modules" ]; then
         log "Installing frontend dependencies with Yarn..."
         yarn install --frozen-lockfile || {
-            warning "Yarn installation failed, falling back to npm..."
+            warning "Yarn installation failed, falling back to npm with legacy peer deps..."
             rm -rf node_modules yarn.lock
-            npm install
+            npm install --legacy-peer-deps
         }
     else
         log "Frontend dependencies already installed..."
@@ -213,8 +260,15 @@ if [ -f "yarn.lock" ] && command -v yarn &> /dev/null; then
 else
     log "Using npm for package management..."
     if [ ! -d "node_modules" ] || [ "$(find node_modules -maxdepth 0 -empty 2>/dev/null)" ]; then
-        log "Installing frontend dependencies with npm..."
-        npm install
+        log "Installing frontend dependencies with npm (using legacy peer deps for ESLint compatibility)..."
+        npm install --legacy-peer-deps || {
+            error "Frontend dependency installation failed. Trying alternative method..."
+            rm -rf node_modules package-lock.json
+            npm install --legacy-peer-deps --force || {
+                error "Frontend installation failed completely. Please check Node.js version and try manually."
+                exit 1
+            }
+        }
     else
         log "Frontend dependencies already installed..."
     fi
@@ -320,6 +374,12 @@ log "Testing backend setup..."
 cd app
 source ../music-u-env/bin/activate
 
+# Verify virtual environment is active
+if [[ "$VIRTUAL_ENV" == "" ]]; then
+    error "Virtual environment not active during testing"
+    exit 1
+fi
+
 # Quick Python import test
 PYTHONPATH=. python3 -c "
 import sys
@@ -342,13 +402,40 @@ cd ..
 log "Testing frontend setup..."
 cd app
 
-# Check if build works
+# Verify node_modules exists
+if [ ! -d "node_modules" ]; then
+    error "node_modules directory not found - frontend installation failed"
+    exit 1
+fi
+
+# Verify key packages are installed
+if [ ! -d "node_modules/next" ]; then
+    error "Next.js not found in node_modules - frontend installation incomplete"
+    exit 1
+fi
+
+# Check TypeScript compilation
+log "Testing TypeScript compilation..."
+if command -v npx >/dev/null 2>&1; then
+    timeout 60 npx tsc --noEmit >/dev/null 2>&1 && {
+        success "TypeScript compilation test passed"
+    } || {
+        warning "TypeScript compilation had issues, but installation can continue"
+    }
+fi
+
+# Test basic build (quick check)
+log "Testing basic build capability..."
 if command -v yarn &> /dev/null && [ -f "yarn.lock" ]; then
-    timeout 30 yarn build >/dev/null 2>&1 || {
+    timeout 90 yarn build >/dev/null 2>&1 && {
+        success "Frontend build test passed"
+    } || {
         warning "Frontend build test failed, but installation may still work"
     }
 else
-    timeout 30 npm run build >/dev/null 2>&1 || {
+    timeout 90 npm run build >/dev/null 2>&1 && {
+        success "Frontend build test passed" 
+    } || {
         warning "Frontend build test failed, but installation may still work"
     }
 fi
