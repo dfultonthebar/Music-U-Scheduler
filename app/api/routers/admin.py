@@ -529,3 +529,130 @@ async def get_lesson_reports(
         instructor_stats=instructor_stats
     )
 
+
+# Update Management Endpoints
+@router.get("/updates/check")
+async def check_for_updates(
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Check for available system updates"""
+    try:
+        import subprocess
+        import os
+        
+        # Get current git status
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True
+        )
+        
+        current_commit = result.stdout.strip() if result.returncode == 0 else "unknown"
+        
+        # Check for remote updates
+        subprocess.run(["git", "fetch", "origin"], capture_output=True)
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD..origin/main"],
+            capture_output=True,
+            text=True
+        )
+        
+        updates_available = int(result.stdout.strip()) if result.returncode == 0 else 0
+        
+        return {
+            "updates_available": updates_available > 0,
+            "update_count": updates_available,
+            "current_version": current_commit[:8],
+            "last_check": datetime.utcnow().isoformat(),
+            "status": "success"
+        }
+    except Exception as e:
+        return {
+            "updates_available": False,
+            "update_count": 0,
+            "current_version": "unknown",
+            "last_check": datetime.utcnow().isoformat(),
+            "status": "error",
+            "error": str(e)
+        }
+
+
+@router.get("/updates/logs")
+async def get_update_logs(
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Get system update logs"""
+    try:
+        import os
+        
+        logs = []
+        log_file = os.path.join(os.getcwd(), "logs", "updates.log")
+        
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                logs = f.readlines()[-50:]  # Get last 50 lines
+        
+        return {
+            "logs": [line.strip() for line in logs],
+            "status": "success"
+        }
+    except Exception as e:
+        return {
+            "logs": [f"Error reading logs: {str(e)}"],
+            "status": "error"
+        }
+
+
+@router.post("/updates/apply")
+async def apply_updates(
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Apply available system updates"""
+    try:
+        import subprocess
+        import os
+        from datetime import datetime
+        
+        # Ensure logs directory exists
+        os.makedirs("logs", exist_ok=True)
+        
+        # Log update attempt
+        with open("logs/updates.log", "a") as f:
+            f.write(f"[{datetime.utcnow().isoformat()}] Update initiated by {current_user.username}\n")
+        
+        # Pull latest changes
+        result = subprocess.run(
+            ["git", "pull", "origin", "main"],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+        
+        success = result.returncode == 0
+        
+        # Log result
+        with open("logs/updates.log", "a") as f:
+            f.write(f"[{datetime.utcnow().isoformat()}] Update {'successful' if success else 'failed'}: {result.stdout if success else result.stderr}\n")
+        
+        if success:
+            return {
+                "status": "success",
+                "message": "Updates applied successfully",
+                "details": result.stdout.strip(),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Update failed",
+                "details": result.stderr.strip(),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Update process failed: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+

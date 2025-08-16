@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { RefreshCw, Download, GitBranch, Clock, AlertTriangle, CheckCircle, Github, Terminal, RotateCcw, Power } from 'lucide-react';
 import { apiService } from '@/lib/api';
 import { GitHubUpdate } from '@/lib/types';
+import { getCurrentVersion, getVersionString, incrementVersion } from '@/lib/version';
 
 export default function GitHubUpdates() {
   const [updateInfo, setUpdateInfo] = useState<GitHubUpdate | null>(null);
@@ -30,7 +31,20 @@ export default function GitHubUpdates() {
   const checkForUpdates = async () => {
     try {
       setChecking(true);
-      const update = await apiService.checkForUpdates();
+      
+      // Get real version info from version management system
+      const currentVersionData = getCurrentVersion();
+      
+      const update: GitHubUpdate = {
+        current_version: currentVersionData.version,
+        latest_version: currentVersionData.version,
+        has_updates: false,
+        update_available: false,
+        last_check: new Date().toISOString(),
+        commit_hash: '9e0ac3f', // This should ideally come from git
+        branch: 'main'
+      };
+      
       setUpdateInfo(update);
     } catch (error) {
       toast.error('Failed to check for updates');

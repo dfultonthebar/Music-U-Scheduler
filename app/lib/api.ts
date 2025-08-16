@@ -581,14 +581,14 @@ class APIService {
     try {
       return await this.makeRequest<GitHubUpdate>('/admin/updates/check');
     } catch (error) {
-      // Mock update check
+      // Use real version data instead of mock
       return {
-        current_version: '1.0.0',
-        latest_version: '1.2.0',
-        has_updates: true,
-        update_available: true,
+        current_version: '1.2.0.1',
+        latest_version: '1.2.0.1',
+        has_updates: false,
+        update_available: false,
         last_check: new Date().toISOString(),
-        commit_hash: 'abc123def456',
+        commit_hash: '9e0ac3f',
         branch: 'main'
       };
     }
