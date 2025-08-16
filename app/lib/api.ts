@@ -60,9 +60,13 @@ class APIService {
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...((options.headers as Record<string, string>) || {}),
     };
+
+    // Only set Content-Type for JSON if not FormData
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     // Add backend JWT token if available
     if (this.token) {

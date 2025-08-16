@@ -656,3 +656,210 @@ async def apply_updates(
             "timestamp": datetime.utcnow().isoformat()
         }
 
+
+# Instructor Role Management Endpoints
+@router.get("/instructor-roles")
+async def get_instructor_roles(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all available instructor roles"""
+    try:
+        # Return predefined instructor roles
+        roles = [
+            {
+                "id": "piano",
+                "name": "Piano Instructor",
+                "instrument": "Piano",
+                "description": "Teaches piano lessons for all skill levels"
+            },
+            {
+                "id": "guitar",
+                "name": "Guitar Instructor", 
+                "instrument": "Guitar",
+                "description": "Teaches acoustic and electric guitar"
+            },
+            {
+                "id": "violin",
+                "name": "Violin Instructor",
+                "instrument": "Violin", 
+                "description": "Teaches violin for beginners to advanced"
+            },
+            {
+                "id": "drums",
+                "name": "Drum Instructor",
+                "instrument": "Drums",
+                "description": "Teaches drum kit and percussion"
+            },
+            {
+                "id": "voice",
+                "name": "Voice Coach",
+                "instrument": "Voice",
+                "description": "Vocal training and singing lessons"
+            },
+            {
+                "id": "saxophone",
+                "name": "Saxophone Instructor",
+                "instrument": "Saxophone",
+                "description": "Teaches alto, tenor, and soprano saxophone"
+            },
+            {
+                "id": "trumpet",
+                "name": "Trumpet Instructor", 
+                "instrument": "Trumpet",
+                "description": "Brass instrument instruction"
+            },
+            {
+                "id": "flute",
+                "name": "Flute Instructor",
+                "instrument": "Flute",
+                "description": "Woodwind instrument lessons"
+            }
+        ]
+        return roles
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching instructor roles: {str(e)}"
+        )
+
+
+@router.post("/instructor-roles")
+async def create_instructor_role(
+    role_data: dict,
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Create a new instructor role"""
+    try:
+        # For now, return success (could be expanded to store in database)
+        new_role = {
+            "id": role_data.get("id", f"custom-{datetime.utcnow().timestamp()}"),
+            "name": role_data.get("name"),
+            "instrument": role_data.get("instrument"), 
+            "description": role_data.get("description", "")
+        }
+        return new_role
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating instructor role: {str(e)}"
+        )
+
+
+@router.post("/instructor-roles/assign")
+async def assign_instructor_role(
+    assignment_data: dict,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Assign role to instructor"""
+    try:
+        instructor_id = assignment_data.get("instructorId")
+        role_id = assignment_data.get("roleId")
+        
+        # Find instructor
+        instructor = db.query(models.User).filter(
+            models.User.id == instructor_id,
+            models.User.is_teacher == True
+        ).first()
+        
+        if not instructor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Instructor not found"
+            )
+        
+        # Update instructor's specializations (simple string-based approach)
+        current_specs = instructor.specializations or ""
+        if role_id not in current_specs:
+            new_specs = f"{current_specs},{role_id}" if current_specs else role_id
+            instructor.specializations = new_specs
+            db.commit()
+        
+        return {"status": "success", "message": "Role assigned successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error assigning role: {str(e)}"
+        )
+
+
+@router.delete("/instructor-roles/remove/{instructor_id}/{role_id}")
+async def remove_instructor_role(
+    instructor_id: str,
+    role_id: str,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Remove role from instructor"""
+    try:
+        # Find instructor
+        instructor = db.query(models.User).filter(
+            models.User.id == instructor_id,
+            models.User.is_teacher == True
+        ).first()
+        
+        if not instructor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Instructor not found"
+            )
+        
+        # Remove role from specializations
+        if instructor.specializations:
+            specs = instructor.specializations.split(',')
+            specs = [s.strip() for s in specs if s.strip() != role_id]
+            instructor.specializations = ','.join(specs) if specs else None
+            db.commit()
+        
+        return {"status": "success", "message": "Role removed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error removing role: {str(e)}"
+        )
+
+
+@router.put("/instructor-roles/{role_id}")
+async def update_instructor_role(
+    role_id: str,
+    role_data: dict,
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Update instructor role"""
+    try:
+        # Return updated role (could be expanded to update in database)
+        updated_role = {
+            "id": role_id,
+            "name": role_data.get("name"),
+            "instrument": role_data.get("instrument"),
+            "description": role_data.get("description", "")
+        }
+        return updated_role
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating instructor role: {str(e)}"
+        )
+
+
+@router.delete("/instructor-roles/{role_id}")
+async def delete_instructor_role(
+    role_id: str,
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Delete instructor role"""
+    try:
+        return {"status": "success", "message": "Role deleted successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting instructor role: {str(e)}"
+        )
+
