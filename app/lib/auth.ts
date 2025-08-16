@@ -40,28 +40,49 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        // Check mock database
-        const user = mockUsers.find(u => u.username === credentials.username)
-        console.log('Found user:', user ? user.username : 'none');
-        
-        if (user) {
-          const passwordMatch = await bcrypt.compare(credentials.password, user.password);
-          console.log('Password match:', passwordMatch);
-          
-          if (passwordMatch) {
-            console.log('Authentication successful for:', user.username);
-            return {
-              id: user.id,
-              email: user.email,
-              name: user.name,
-              role: user.role,
-              username: user.username
+        try {
+          // Authenticate with backend API
+          const formData = new FormData();
+          formData.append('username', credentials.username);
+          formData.append('password', credentials.password);
+
+          const response = await fetch('http://localhost:8080/auth/login', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (response.ok) {
+            const authData = await response.json();
+            console.log('Backend authentication successful for:', credentials.username);
+            
+            // Get user details from backend
+            const userResponse = await fetch('http://localhost:8080/auth/me', {
+              headers: {
+                'Authorization': `Bearer ${authData.access_token}`,
+              },
+            });
+
+            if (userResponse.ok) {
+              const userData = await userResponse.json();
+              console.log('User data retrieved:', userData.username);
+              
+              return {
+                id: userData.id.toString(),
+                email: userData.email,
+                name: userData.full_name || userData.username,
+                role: userData.is_teacher ? 'instructor' : 'admin',
+                username: userData.username,
+                backendToken: authData.access_token
+              }
             }
           }
-        }
 
-        console.log('Authentication failed');
-        return null
+          console.log('Backend authentication failed');
+          return null;
+        } catch (error) {
+          console.error('Authentication error:', error);
+          return null;
+        }
       }
     })
   ],
@@ -77,6 +98,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as any).role
         token.username = (user as any).username
+        token.backendToken = (user as any).backendToken
       }
       return token
     },
@@ -85,6 +107,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).role = token.role as string
         (session.user as any).id = token.sub as string
         (session.user as any).username = token.username as string
+        (session.user as any).backendToken = token.backendToken as string
       }
       return session
     },

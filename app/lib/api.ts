@@ -68,9 +68,15 @@ class APIService {
       headers['Content-Type'] = 'application/json';
     }
 
-    // Add backend JWT token if available
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    // Get backend JWT token from NextAuth session
+    try {
+      const session = await getSession();
+      const backendToken = (session?.user as any)?.backendToken;
+      if (backendToken) {
+        headers.Authorization = `Bearer ${backendToken}`;
+      }
+    } catch (error) {
+      console.warn('Could not get session for API request:', error);
     }
 
     try {

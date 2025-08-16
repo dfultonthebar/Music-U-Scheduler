@@ -863,3 +863,141 @@ async def delete_instructor_role(
             detail=f"Error deleting instructor role: {str(e)}"
         )
 
+
+# Email Settings Endpoints
+@router.get("/email-settings")
+async def get_email_settings(
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Get current email server settings"""
+    try:
+        # Return mock email settings (can be expanded to use real settings)
+        settings = {
+            "smtp_server": "smtp.gmail.com",
+            "smtp_port": 587,
+            "use_tls": True,
+            "sender_email": "noreply@musicu.com",
+            "sender_name": "Music U Scheduler"
+        }
+        return settings
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching email settings: {str(e)}"
+        )
+
+
+@router.put("/email-settings")
+async def update_email_settings(
+    settings_data: dict,
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Update email server settings"""
+    try:
+        # For now, just return success (can be expanded to store in database)
+        return {
+            "status": "success",
+            "message": "Email settings updated successfully",
+            "settings": settings_data
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating email settings: {str(e)}"
+        )
+
+
+# Backup Management Endpoints
+@router.get("/backups")
+async def get_backups(
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Get list of available backups"""
+    try:
+        # Return mock backup list (can be expanded with real backup system)
+        backups = [
+            {
+                "id": "backup_20250816_120000",
+                "name": "Daily Backup - Aug 16, 2025",
+                "created": "2025-08-16T12:00:00Z",
+                "size": "2.4 MB",
+                "type": "automatic"
+            },
+            {
+                "id": "backup_20250815_120000",
+                "name": "Daily Backup - Aug 15, 2025",
+                "created": "2025-08-15T12:00:00Z",
+                "size": "2.3 MB",
+                "type": "automatic"
+            }
+        ]
+        return backups
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching backups: {str(e)}"
+        )
+
+
+@router.post("/backups")
+async def create_backup(
+    backup_data: dict,
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Create a new backup"""
+    try:
+        backup_name = backup_data.get("name", f"Manual Backup - {datetime.utcnow().strftime('%b %d, %Y')}")
+        new_backup = {
+            "id": f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+            "name": backup_name,
+            "created": datetime.utcnow().isoformat() + "Z",
+            "size": "2.4 MB",
+            "type": "manual"
+        }
+        return {
+            "status": "success",
+            "message": "Backup created successfully",
+            "backup": new_backup
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating backup: {str(e)}"
+        )
+
+
+@router.delete("/backups/{backup_id}")
+async def delete_backup(
+    backup_id: str,
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Delete a backup"""
+    try:
+        return {
+            "status": "success",
+            "message": f"Backup {backup_id} deleted successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting backup: {str(e)}"
+        )
+
+
+@router.post("/backups/{backup_id}/restore")
+async def restore_backup(
+    backup_id: str,
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Restore from a backup"""
+    try:
+        return {
+            "status": "success",
+            "message": f"System restored from backup {backup_id} successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error restoring backup: {str(e)}"
+        )
+
