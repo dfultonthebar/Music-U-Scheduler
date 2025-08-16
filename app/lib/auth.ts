@@ -1,27 +1,6 @@
 
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import bcrypt from "bcryptjs"
-
-// Mock user database - replace with actual database in production
-const mockUsers = [
-  {
-    id: "1",
-    username: "admin",
-    email: "admin@musicu.com",
-    password: "$2a$12$RIgUENTyEG/z4o2cyseTsODvXEMBejoDV1QcLLW4JoR5ltmJJS/T6", // MusicU2025
-    name: "Music U Admin",
-    role: "admin"
-  },
-  {
-    id: "2", 
-    username: "john",
-    email: "john@doe.com",
-    password: "$2a$12$cKoi44U7czdivPX51.oBDuUF01WywyRxne1q3X6A7kH/ZNzcQd84O", // johndoe123 
-    name: "John Doe",
-    role: "admin"
-  }
-]
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -32,12 +11,12 @@ export const authOptions: NextAuthOptions = {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         console.log('NextAuth authorize called with:', credentials?.username);
         
         if (!credentials?.username || !credentials?.password) {
           console.log('Missing credentials');
-          return null
+          return null;
         }
 
         try {
@@ -70,10 +49,10 @@ export const authOptions: NextAuthOptions = {
                 id: userData.id.toString(),
                 email: userData.email,
                 name: userData.full_name || userData.username,
-                role: userData.is_teacher ? 'instructor' : 'admin',
+                role: userData.role || 'admin',
                 username: userData.username,
                 backendToken: authData.access_token
-              }
+              };
             }
           }
 
@@ -87,7 +66,7 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as const,
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
@@ -96,33 +75,32 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role
-        token.username = (user as any).username
-        token.backendToken = (user as any).backendToken
+        token.role = (user as any).role;
+        token.username = (user as any).username;
+        token.backendToken = (user as any).backendToken;
       }
-      return token
+      return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        (session.user as any).role = token.role as string
-        (session.user as any).id = token.sub as string
-        (session.user as any).username = token.username as string
-        (session.user as any).backendToken = token.backendToken as string
+        (session.user as any).role = token.role as string;
+        (session.user as any).id = token.sub as string;
+        (session.user as any).username = token.username as string;
+        (session.user as any).backendToken = token.backendToken as string;
       }
-      return session
+      return session;
     },
-    async signIn({ user }) {
+    async signIn({ user, account, profile, email, credentials }) {
       console.log('SignIn callback - user authenticated:', user?.name);
-      return true
+      return true;
     },
     async redirect({ url, baseUrl }) {
       // Allow relative URLs and same-origin URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      // Allow same origin URLs
-      else if (new URL(url).origin === baseUrl) return url
-      // Otherwise redirect to admin page for admin users
-      return `${baseUrl}/admin`
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return baseUrl;
     }
   },
-  secret: process.env.NEXTAUTH_SECRET
-}
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: false, // Disable debug mode for production
+};

@@ -20,7 +20,7 @@ def test_complete_integration():
     
     login_data = {
         'username': 'admin',
-        'password': 'admin123'
+        'password': 'MusicU2025'
     }
     
     try:

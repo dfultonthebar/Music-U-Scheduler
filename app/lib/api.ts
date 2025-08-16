@@ -54,10 +54,29 @@ class APIService {
     }
   }
 
+  // Helper method to sync token from session
+  async syncTokenFromSession(): Promise<void> {
+    try {
+      if (typeof window !== 'undefined') {
+        const session = await getSession();
+        const backendToken = (session?.user as any)?.backendToken;
+        if (backendToken && backendToken !== this.token) {
+          console.log('Syncing token from session');
+          this.setToken(backendToken);
+        }
+      }
+    } catch (error) {
+      console.warn('Error syncing token from session:', error);
+    }
+  }
+
   private async makeRequest<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    // Ensure we have the latest token from session
+    await this.syncTokenFromSession();
+    
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {
       ...((options.headers as Record<string, string>) || {}),
@@ -68,33 +87,35 @@ class APIService {
       headers['Content-Type'] = 'application/json';
     }
 
-    // Get backend JWT token from NextAuth session
-    try {
-      const session = await getSession();
-      const backendToken = (session?.user as any)?.backendToken;
-      if (backendToken) {
-        headers.Authorization = `Bearer ${backendToken}`;
-      }
-    } catch (error) {
-      console.warn('Could not get session for API request:', error);
+    // Use the synced token
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+      console.log('API Request with auth token to:', endpoint);
+    } else {
+      console.warn('No auth token available for API request to:', endpoint);
     }
 
     try {
+      console.log('Making API request to:', url, 'with headers:', Object.keys(headers));
       const response = await fetch(url, {
         ...options,
         headers,
       });
 
       if (!response.ok) {
+        console.error('API request failed:', response.status, response.statusText, 'for', url);
         const errorData = await response.json().catch(() => ({ detail: 'Request failed' }));
         throw new APIError(response.status, errorData.detail || 'Request failed');
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log('API request successful to:', endpoint);
+      return data;
     } catch (error) {
       if (error instanceof APIError) {
         throw error;
       }
+      console.error('Network error for API request:', error);
       throw new APIError(500, 'Network error occurred');
     }
   }
