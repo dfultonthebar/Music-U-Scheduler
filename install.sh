@@ -40,9 +40,42 @@ fi
 
 log "Starting Music U Scheduler installation..."
 
-# Get the directory of the script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# Check if we need to clone the repository
+if [ ! -f "requirements.txt" ] && [ ! -d "app" ]; then
+    log "Cloning Music U Scheduler repository..."
+    
+    # Check if git is installed
+    if ! command -v git &> /dev/null; then
+        error "Git is required but not installed. Please install git first:"
+        echo "  Ubuntu/Debian: sudo apt update && sudo apt install git"
+        echo "  CentOS/RHEL: sudo yum install git"
+        exit 1
+    fi
+    
+    # Clone the repository
+    if [ -d "Music-U-Scheduler" ]; then
+        warning "Music-U-Scheduler directory already exists, updating..."
+        cd Music-U-Scheduler
+        git pull origin main || {
+            error "Failed to update existing repository"
+            exit 1
+        }
+    else
+        git clone https://github.com/dfultonthebar/Music-U-Scheduler.git || {
+            error "Failed to clone repository. Please check your internet connection."
+            exit 1
+        }
+        cd Music-U-Scheduler
+    fi
+    
+    log "Repository cloned successfully"
+else
+    log "Using existing repository files..."
+fi
+
+# Get the directory of the script/repository
+SCRIPT_DIR="$(pwd)"
+log "Working directory: $SCRIPT_DIR"
 
 # 1. System Requirements Check
 log "Checking system requirements..."
