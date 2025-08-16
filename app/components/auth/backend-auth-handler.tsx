@@ -3,7 +3,7 @@
 
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { api } from '@/lib/api';
+import { apiService } from '@/lib/api';
 
 /**
  * Component that handles backend authentication when NextAuth session is active
@@ -30,7 +30,7 @@ export function BackendAuthHandler() {
             };
 
             console.log('🔐 Authenticating with backend API...');
-            await api.login(credentials);
+            await apiService.login(credentials);
             console.log('✅ Backend authentication successful');
           }
         } catch (error) {

@@ -5,7 +5,7 @@
 
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { api } from '@/lib/api';
+import { apiService } from '@/lib/api';
 
 export function useBackendAuth() {
   const { data: session, status } = useSession();
@@ -28,7 +28,7 @@ export function useBackendAuth() {
             };
 
             console.log('🔐 Authenticating with backend for admin user...');
-            await api.login(credentials);
+            await apiService.login(credentials);
             console.log('✅ Backend authentication successful');
           }
         } catch (error) {

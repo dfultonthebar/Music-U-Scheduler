@@ -449,51 +449,14 @@ class APIService {
   }
 
   async getInstructorWithRoles(instructorId: string): Promise<InstructorWithRoles> {
-    try {
-      return await this.makeRequest<InstructorWithRoles>(`/admin/instructors/${instructorId}/roles`);
-    } catch (error) {
-      // Mock response for testing - find instructor and add roles
-      const instructor = this.mockUsers.find(u => u.id === instructorId && u.role === 'instructor');
-      if (!instructor) {
-        throw new Error('Instructor not found');
-      }
-      
-      const instructorWithRoles: InstructorWithRoles = {
-        ...instructor,
-        assigned_roles: [
-          {
-            id: 'role-1',
-            name: 'Piano Instructor',
-            description: 'Certified piano teacher',
-            permissions: ['teach_piano', 'schedule_lessons', 'view_students']
-          }
-        ]
-      };
-      return instructorWithRoles;
-    }
+    return await this.makeRequest<InstructorWithRoles>(`/admin/instructors/${instructorId}/roles`);
   }
 
   async promoteToAdmin(data: PromoteToAdminData): Promise<User> {
-    try {
-      return await this.makeRequest<User>('/admin/users/promote-to-admin', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    } catch (error) {
-      // Mock response for testing
-      const userIndex = this.mockUsers.findIndex(u => u.id === data.user_id);
-      if (userIndex === -1) {
-        throw new Error('User not found');
-      }
-      
-      this.mockUsers[userIndex] = {
-        ...this.mockUsers[userIndex],
-        role: 'admin'
-      };
-      
-      console.log('Promote to admin mock:', this.mockUsers[userIndex]);
-      return this.mockUsers[userIndex];
-    }
+    return await this.makeRequest<User>('/admin/users/promote-to-admin', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // Email Server Settings
