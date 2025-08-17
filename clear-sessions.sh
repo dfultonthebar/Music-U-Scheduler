@@ -32,7 +32,7 @@ NEW_SECRET=$(openssl rand -base64 32)
 if [ -f "app/.env" ]; then
     # Update existing .env
     if grep -q "NEXTAUTH_SECRET=" app/.env; then
-        sed -i "s/NEXTAUTH_SECRET=.*/NEXTAUTH_SECRET=$NEW_SECRET/" app/.env
+        sed -i "s|NEXTAUTH_SECRET=.*|NEXTAUTH_SECRET=$NEW_SECRET|" app/.env
     else
         echo "NEXTAUTH_SECRET=$NEW_SECRET" >> app/.env
     fi
