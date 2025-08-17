@@ -1,5 +1,5 @@
 
-# 🎵 Music U Scheduler
+# 🎵 Music U Scheduler v1.3.00
 
 A comprehensive music lesson scheduling application built with Next.js (frontend) and FastAPI (backend), featuring JWT authentication, admin panels, instructor dashboards, and student management.
 
