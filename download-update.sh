@@ -115,8 +115,19 @@ print_status "Checking current version..."
 cd "$PROJECT_DIR"
 
 # Check if we're in the right directory
-if [ ! -f "package.json" ] || [ ! -f "requirements.txt" ]; then
+if [ ! -f "requirements.txt" ] || [ ! -f "app/package.json" ]; then
     print_error "This doesn't appear to be a valid Music U Scheduler installation."
+    print_error "Looking for: requirements.txt and app/package.json"
+    if [ -f "requirements.txt" ]; then
+        print_status "✓ Found requirements.txt"
+    else
+        print_error "✗ Missing requirements.txt"
+    fi
+    if [ -f "app/package.json" ]; then
+        print_status "✓ Found app/package.json"  
+    else
+        print_error "✗ Missing app/package.json"
+    fi
     exit 1
 fi
 

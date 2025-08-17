@@ -28,8 +28,17 @@ fi
 
 # Download the full installer
 echo -e "${GREEN}📥 Downloading Music U Scheduler...${NC}"
-git clone https://github.com/dfultonthebar/Music-U-Scheduler.git
-cd Music-U-Scheduler
+
+# Check if directory already exists
+if [ -d "Music-U-Scheduler" ]; then
+    echo -e "${GREEN}📁 Directory already exists, entering existing installation...${NC}"
+    cd Music-U-Scheduler
+    # Download the latest updater script
+    curl -L https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/download-update.sh -o download-update.sh
+else
+    git clone https://github.com/dfultonthebar/Music-U-Scheduler.git
+    cd Music-U-Scheduler
+fi
 
 echo -e "${GREEN}🚀 Running installer...${NC}"
 chmod +x download-update.sh
