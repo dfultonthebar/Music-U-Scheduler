@@ -33,8 +33,7 @@ export default function GitHubUpdates() {
       setChecking(true);
       
       // Get version info from backend API
-      const response = await apiService.get('/admin/version-info');
-      const backendVersionInfo = response;
+      const backendVersionInfo = await apiService.getVersionInfo();
       
       // Also get frontend version info
       const currentVersionData = getCurrentVersion();
