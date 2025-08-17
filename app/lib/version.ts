@@ -56,11 +56,29 @@ class VersionManager {
     return {
       major: 1,
       minor: 3,
-      patch: 0,
+      patch: 1,
       build: 0,
-      version: '1.3.00',
+      version: '1.3.01',
       lastUpdated: new Date().toISOString(),
       changelog: [
+        {
+          id: 'v1.3.01',
+          version: '1.3.01',
+          date: '2025-08-17T01:00:00Z',
+          type: 'patch',
+          description: 'Critical Authentication Fixes - Login Issues Resolved',
+          changes: [
+            'Fixed NextAuth.js webpack compilation errors',
+            'Added missing NEXTAUTH_SECRET environment variable',
+            'Resolved session cookie authentication failures',
+            'Fixed NextAuth route configuration issues',
+            'Enhanced cookie and JWT session management',
+            'Corrected TypeScript errors preventing frontend build',
+            'Improved NextAuth configuration for production stability',
+            'Verified admin login credentials (Username: admin, Password: MusicU2025)'
+          ],
+          author: 'DeepAgent'
+        },
         {
           id: 'v1.3.00',
           version: '1.3.00',
