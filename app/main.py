@@ -16,7 +16,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Music U Lesson Scheduler",
     description="A comprehensive music lesson scheduling application with JWT authentication, admin panel, and instructor dashboard",
-    version="0.3.0"
+    version="1.3.00"
 )
 
 # Configure CORS
@@ -46,7 +46,7 @@ async def root():
     """Root endpoint"""
     return {
         "message": "Welcome to Music U Lesson Scheduler API",
-        "version": "0.3.0",
+        "version": "1.3.00",
         "docs": "/docs",
         "redoc": "/redoc",
         "auth": {

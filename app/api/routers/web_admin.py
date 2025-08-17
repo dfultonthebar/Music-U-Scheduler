@@ -208,3 +208,19 @@ async def admin_audit_logs_page(
             "audit_logs": audit_logs
         }
     )
+
+@router.get("/version-info")
+async def get_version_info():
+    """Get current system version information"""
+    from datetime import datetime
+    return {
+        "current_version": "1.3.00",
+        "latest_version": "1.3.00", 
+        "has_updates": False,
+        "update_available": False,
+        "last_check": datetime.utcnow().isoformat(),
+        "commit_hash": "043c0aa",
+        "branch": "main",
+        "release_date": "2025-08-16T18:47:00Z",
+        "description": "Complete Authentication Integration - Production Release"
+    }

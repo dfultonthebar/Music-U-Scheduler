@@ -32,7 +32,27 @@ export default function GitHubUpdates() {
     try {
       setChecking(true);
       
-      // Get real version info from version management system
+      // Get version info from backend API
+      const response = await apiService.get('/admin/version-info');
+      const backendVersionInfo = response;
+      
+      // Also get frontend version info
+      const currentVersionData = getCurrentVersion();
+      
+      const update: GitHubUpdate = {
+        current_version: backendVersionInfo.current_version,
+        latest_version: backendVersionInfo.latest_version,
+        has_updates: backendVersionInfo.has_updates || false,
+        update_available: backendVersionInfo.update_available || false,
+        last_check: backendVersionInfo.last_check || new Date().toISOString(),
+        commit_hash: backendVersionInfo.commit_hash || '043c0aa',
+        branch: backendVersionInfo.branch || 'main'
+      };
+      
+      setUpdateInfo(update);
+    } catch (error) {
+      // Fallback to local version if API fails
+      console.error('Failed to get backend version, using local:', error);
       const currentVersionData = getCurrentVersion();
       
       const update: GitHubUpdate = {
@@ -41,13 +61,12 @@ export default function GitHubUpdates() {
         has_updates: false,
         update_available: false,
         last_check: new Date().toISOString(),
-        commit_hash: '9e0ac3f', // This should ideally come from git
+        commit_hash: '043c0aa',
         branch: 'main'
       };
       
       setUpdateInfo(update);
-    } catch (error) {
-      toast.error('Failed to check for updates');
+      toast.error('Failed to check for updates from server, showing local version');
     } finally {
       setChecking(false);
       setLoading(false);
