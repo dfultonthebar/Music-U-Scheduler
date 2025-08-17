@@ -51,12 +51,19 @@ fi
 if [ -d "$PROJECT_DIR" ]; then
     print_warning "Existing installation found at $PROJECT_DIR"
     echo ""
-    echo "Choose an option:"
-    echo "1) Update existing installation (recommended)"
-    echo "2) Fresh installation (will backup existing)"
-    echo "3) Cancel"
-    echo ""
-    read -p "Enter your choice (1-3): " choice
+    
+    # Check if running in non-interactive mode (piped input)
+    if [ ! -t 0 ]; then
+        print_status "Non-interactive mode detected. Performing update..."
+        choice=1
+    else
+        echo "Choose an option:"
+        echo "1) Update existing installation (recommended)"
+        echo "2) Fresh installation (will backup existing)"
+        echo "3) Cancel"
+        echo ""
+        read -p "Enter your choice (1-3): " choice
+    fi
     
     case $choice in
         1)
@@ -94,8 +101,27 @@ if [ -d "$PROJECT_DIR" ]; then
             exit 0
             ;;
         *)
-            print_error "Invalid choice. Exiting."
-            exit 1
+            print_error "Invalid choice. Using default: Update existing installation"
+            choice=1
+            cd "$PROJECT_DIR"
+            
+            # Create backup of current state
+            BACKUP_NAME="backup_$(date +%Y%m%d_%H%M%S)"
+            print_status "Creating backup: $BACKUP_NAME"
+            cp -r "$PROJECT_DIR" "$INSTALL_DIR/$BACKUP_NAME"
+            
+            # Check if there are local changes
+            if ! git diff --quiet || ! git diff --staged --quiet; then
+                print_warning "Local changes detected. Stashing them..."
+                git stash push -m "Auto-stash before update $(date)"
+            fi
+            
+            # Pull latest changes
+            print_status "Pulling latest changes from GitHub..."
+            git fetch origin
+            git reset --hard origin/main
+            
+            UPDATE_MODE=true
             ;;
     esac
 else
@@ -114,10 +140,16 @@ fi
 print_status "Checking current version..."
 cd "$PROJECT_DIR"
 
+# Debug: Show current directory and files
+print_status "Current directory: $(pwd)"
+print_status "Directory contents:"
+ls -la | head -10
+
 # Check if we're in the right directory
 if [ ! -f "requirements.txt" ] || [ ! -f "app/package.json" ]; then
     print_error "This doesn't appear to be a valid Music U Scheduler installation."
     print_error "Looking for: requirements.txt and app/package.json"
+    print_error "Current directory: $(pwd)"
     if [ -f "requirements.txt" ]; then
         print_status "✓ Found requirements.txt"
     else
@@ -128,7 +160,15 @@ if [ ! -f "requirements.txt" ] || [ ! -f "app/package.json" ]; then
     else
         print_error "✗ Missing app/package.json"
     fi
-    exit 1
+    
+    # Try to find the correct directory
+    if [ -d "Music-U-Scheduler" ] && [ -f "Music-U-Scheduler/requirements.txt" ]; then
+        print_status "Found nested Music-U-Scheduler directory, entering..."
+        cd Music-U-Scheduler
+    else
+        print_error "Cannot locate valid installation directory."
+        exit 1
+    fi
 fi
 
 # Get version from package.json
@@ -141,17 +181,27 @@ fi
 if [ ! -d "music-u-env" ]; then
     print_status "Creating Python virtual environment..."
     python3 -m venv music-u-env
+    if [ $? -ne 0 ]; then
+        print_error "Failed to create virtual environment. Trying with python..."
+        python -m venv music-u-env
+    fi
 fi
 
 # Activate virtual environment and update dependencies
 print_status "Updating Python dependencies..."
-source music-u-env/bin/activate
-
-# Upgrade pip first
-pip install --upgrade pip
-
-# Install/update requirements
-pip install -r requirements.txt
+if [ -f "music-u-env/bin/activate" ]; then
+    source music-u-env/bin/activate
+    
+    # Upgrade pip first
+    pip install --upgrade pip
+    
+    # Install/update requirements
+    pip install -r requirements.txt
+else
+    print_error "Virtual environment activation failed. Attempting direct install..."
+    python3 -m pip install --user --upgrade pip
+    python3 -m pip install --user -r requirements.txt
+fi
 
 # Update Node.js dependencies if needed
 if [ -d "app" ]; then
