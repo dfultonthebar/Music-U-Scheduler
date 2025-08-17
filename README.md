@@ -1,7 +1,37 @@
 
-# 🎵 Music U Scheduler v1.3.00
+# 🎵 Music U Scheduler v1.3.02
 
 A comprehensive music lesson scheduling application built with Next.js (frontend) and FastAPI (backend), featuring JWT authentication, admin panels, instructor dashboards, and student management.
+
+## 📥 Quick Download & Installation
+
+### 🚀 One-Click Download (Recommended)
+```bash
+curl -L https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/quick-download.sh | bash
+```
+
+### 🔄 Manual Download
+```bash
+git clone https://github.com/dfultonthebar/Music-U-Scheduler.git
+cd Music-U-Scheduler
+chmod +x download-update.sh
+./download-update.sh
+```
+
+### 📱 Update Existing Installation
+```bash
+cd Music-U-Scheduler
+curl -L https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/download-update.sh -o download-update.sh
+chmod +x download-update.sh
+./download-update.sh
+```
+
+**After Installation:**
+- 🌐 Frontend: http://localhost:3000
+- ⚡ Backend: http://localhost:8001
+- 👤 Admin Login: **admin** / **MusicU2025**
+
+---
 
 ## ✨ Features
 
@@ -35,19 +65,13 @@ A comprehensive music lesson scheduling application built with Next.js (frontend
 - **Backup and restore** functionality
 - **Audit logging** for security compliance
 
-## 🚀 Quick Start
+## 🚀 Installation Details
 
 ### Prerequisites
 
 - **Node.js** 18+ 
 - **Python** 3.8+
 - **Git**
-
-### One-Line Installation
-
-```bash
-curl -sSL https://raw.githubusercontent.com/dfultonthebar/Music-U-Scheduler/main/install.sh | bash
-```
 
 This installer will:
 - ✅ Automatically clone the repository
