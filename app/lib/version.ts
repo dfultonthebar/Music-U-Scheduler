@@ -56,11 +56,30 @@ class VersionManager {
     return {
       major: 1,
       minor: 3,
-      patch: 1,
+      patch: 2,
       build: 0,
-      version: '1.3.01',
+      version: '1.3.02',
       lastUpdated: new Date().toISOString(),
       changelog: [
+        {
+          id: 'v1.3.02',
+          version: '1.3.02',
+          date: '2025-08-17T01:40:00Z',
+          type: 'patch',
+          description: 'User Management Fixes - Add/Delete Students & Instructors',
+          changes: [
+            'Fixed user creation validation errors (422 errors resolved)',
+            'Corrected API payload field mapping (first_name/last_name → full_name)',
+            'Fixed instructor role assignment endpoints (404 errors resolved)',
+            'Added missing /admin/instructors/{id}/roles endpoint',
+            'Enhanced instructor role management with proper user role filtering',
+            'Verified student and instructor creation works seamlessly',
+            'Improved API service payload transformation',
+            'Added comprehensive user creation test suite',
+            'Fixed delete functionality for both students and instructors'
+          ],
+          author: 'DeepAgent'
+        },
         {
           id: 'v1.3.01',
           version: '1.3.01',

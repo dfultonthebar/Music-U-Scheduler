@@ -754,13 +754,14 @@ async def assign_instructor_role(
 ):
     """Assign role to instructor"""
     try:
-        instructor_id = assignment_data.get("instructorId")
-        role_id = assignment_data.get("roleId")
+        # Handle both camelCase and snake_case
+        instructor_id = assignment_data.get("instructor_id") or assignment_data.get("instructorId")
+        role_id = assignment_data.get("role_id") or assignment_data.get("roleId")
         
         # Find instructor
         instructor = db.query(models.User).filter(
             models.User.id == instructor_id,
-            models.User.is_teacher == True
+            models.User.role == models.UserRole.INSTRUCTOR
         ).first()
         
         if not instructor:
@@ -799,7 +800,7 @@ async def remove_instructor_role(
         # Find instructor
         instructor = db.query(models.User).filter(
             models.User.id == instructor_id,
-            models.User.is_teacher == True
+            models.User.role == models.UserRole.INSTRUCTOR
         ).first()
         
         if not instructor:
@@ -999,5 +1000,93 @@ async def restore_backup(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error restoring backup: {str(e)}"
+        )
+
+
+# Missing Instructor Role Management Endpoints
+@router.get("/instructors/{instructor_id}/roles")
+async def get_instructor_with_roles(
+    instructor_id: int,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get an instructor with their assigned roles"""
+    try:
+        # Get the instructor
+        instructor = crud.get_user(db, instructor_id)
+        if not instructor:
+            raise HTTPException(status_code=404, detail="Instructor not found")
+        
+        if instructor.role != models.UserRole.INSTRUCTOR:
+            raise HTTPException(status_code=400, detail="User is not an instructor")
+        
+        # For now, return mock assigned roles (in future, this would come from a roles table)
+        assigned_roles = []
+        if instructor.specializations:
+            specializations = instructor.specializations.split(',')
+            # Map specializations to role IDs
+            for spec in specializations:
+                spec = spec.strip().lower()
+                if 'piano' in spec:
+                    assigned_roles.append({
+                        "id": "piano",
+                        "name": "Piano Instructor",
+                        "instrument": "Piano",
+                        "description": "Teaches piano lessons for all skill levels"
+                    })
+                elif 'guitar' in spec:
+                    assigned_roles.append({
+                        "id": "guitar", 
+                        "name": "Guitar Instructor",
+                        "instrument": "Guitar",
+                        "description": "Teaches acoustic and electric guitar"
+                    })
+                elif 'violin' in spec:
+                    assigned_roles.append({
+                        "id": "violin",
+                        "name": "Violin Instructor", 
+                        "instrument": "Violin",
+                        "description": "Teaches violin for beginners to advanced"
+                    })
+        
+        return {
+            "id": instructor.id,
+            "username": instructor.username,
+            "email": instructor.email,
+            "full_name": instructor.full_name,
+            "role": instructor.role,
+            "assigned_roles": assigned_roles
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching instructor roles: {str(e)}"
+        )
+
+
+# Fix version-info endpoint
+@router.get("/version-info")
+async def get_version_info(
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Get current system version information"""
+    try:
+        return {
+            "version": "1.3.02",
+            "build": "202508170140",
+            "last_updated": "2025-08-17T01:40:00Z",
+            "status": "production",
+            "features": [
+                "Authentication Integration",
+                "User Management", 
+                "Lesson Scheduling",
+                "Admin Dashboard",
+                "Backup System"
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting version info: {str(e)}"
         )
 

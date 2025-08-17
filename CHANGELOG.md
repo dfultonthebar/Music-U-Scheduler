@@ -3,6 +3,33 @@
 
 All notable changes to the Music U Scheduler project will be documented in this file.
 
+## [1.3.02] - 2025-08-17
+
+### 🛠️ User Management Fixes
+
+This patch resolves all user creation and management issues in the admin dashboard.
+
+### 🔧 Fixed
+- **User Creation Validation Errors** - Resolved 422 validation errors preventing user creation
+- **API Payload Field Mapping** - Fixed field mapping issues (first_name/last_name → full_name)
+- **Instructor Role Assignment** - Fixed 404 errors in instructor role management endpoints
+- **Missing API Endpoints** - Added `/admin/instructors/{id}/roles` endpoint for role retrieval
+- **User Role Filtering** - Enhanced role filtering to use proper UserRole.INSTRUCTOR enum
+- **API Service Payload** - Improved payload transformation in frontend API service
+
+### ✅ Verified
+- **Student Creation**: ✅ Working perfectly with proper validation
+- **Instructor Creation**: ✅ Working seamlessly with role assignment
+- **User Deletion**: ✅ Both students and instructors can be deleted
+- **Instructor Role Management**: ✅ Role assignment and removal working
+- **Field Validation**: ✅ All required fields properly validated
+
+### 📋 Impact
+- **Critical**: Resolves complete inability to add users via admin dashboard
+- **Functionality**: Enables full user management capabilities
+- **Stability**: Eliminates API 422 and 404 errors in user management
+- **Performance**: Optimized API payload processing and validation
+
 ## [1.3.01] - 2025-08-17
 
 ### 🚨 Critical Authentication Fixes

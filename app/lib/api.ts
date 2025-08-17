@@ -219,9 +219,13 @@ class APIService {
   // Enhanced Admin User Management
   async createUser(userData: CreateUserData): Promise<User> {
     const payload = {
-      ...userData,
-      full_name: `${userData.first_name} ${userData.last_name}`,
-      is_instructor: userData.role === 'instructor'
+      username: userData.username,
+      email: userData.email,
+      password: userData.password,
+      full_name: `${userData.first_name} ${userData.last_name}`.trim(),
+      phone: userData.phone || null,
+      role: userData.role,
+      is_teacher: userData.role === 'instructor',
     };
     
     return await this.makeRequest<User>('/admin/users', {

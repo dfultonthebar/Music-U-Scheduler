@@ -16,7 +16,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Music U Lesson Scheduler",
     description="A comprehensive music lesson scheduling application with JWT authentication, admin panel, and instructor dashboard",
-    version="1.3.01"
+    version="1.3.02"
 )
 
 # Configure CORS
