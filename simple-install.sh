@@ -69,13 +69,42 @@ cd Music-U-Scheduler
 
 print_status "Setting up Python environment..."
 
+# Install python3-venv if not available
+if ! python3 -c "import venv" 2>/dev/null; then
+    print_status "Installing python3-venv..."
+    sudo apt update && sudo apt install -y python3-venv python3-full
+fi
+
 # Create virtual environment
-python3 -m venv music-u-env
+print_status "Creating virtual environment..."
+if python3 -m venv music-u-env; then
+    print_status "Virtual environment created successfully"
+else
+    print_error "Failed to create virtual environment"
+    exit 1
+fi
+
+# Verify virtual environment
+if [ ! -f "music-u-env/bin/activate" ]; then
+    print_error "Virtual environment activation script not found"
+    exit 1
+fi
 
 # Activate and install dependencies
+print_status "Activating virtual environment..."
 source music-u-env/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+
+if [ $? -eq 0 ]; then
+    print_status "Virtual environment activated successfully"
+    python --version
+    
+    print_status "Installing Python dependencies..."
+    pip install --upgrade pip
+    pip install -r requirements.txt
+else
+    print_error "Failed to activate virtual environment"
+    exit 1
+fi
 
 print_status "Setting up Node.js environment..."
 cd app

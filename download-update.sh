@@ -177,20 +177,51 @@ if [ -f "app/package.json" ]; then
     print_status "Downloaded version: $VERSION"
 fi
 
+# Install python3-venv if not available
+if ! python3 -c "import venv" 2>/dev/null; then
+    print_status "Installing python3-venv..."
+    if command -v sudo &> /dev/null; then
+        sudo apt update && sudo apt install -y python3-venv python3-full
+    else
+        print_warning "sudo not available. You may need to install python3-venv manually"
+    fi
+fi
+
 # Check if Python virtual environment exists
 if [ ! -d "music-u-env" ]; then
     print_status "Creating Python virtual environment..."
+    if python3 -m venv music-u-env; then
+        print_status "Virtual environment created successfully"
+    else
+        print_error "Failed to create virtual environment with python3. Trying alternatives..."
+        if command -v python &> /dev/null; then
+            python -m venv music-u-env
+        else
+            print_error "Cannot create virtual environment. Python venv module not available"
+            exit 1
+        fi
+    fi
+fi
+
+# Verify virtual environment exists and is valid
+if [ ! -f "music-u-env/bin/activate" ]; then
+    print_error "Virtual environment activation script not found at music-u-env/bin/activate"
+    print_error "Attempting to recreate virtual environment..."
+    rm -rf music-u-env 2>/dev/null
     python3 -m venv music-u-env
-    if [ $? -ne 0 ]; then
-        print_error "Failed to create virtual environment. Trying with python..."
-        python -m venv music-u-env
+    if [ ! -f "music-u-env/bin/activate" ]; then
+        print_error "Cannot create working virtual environment"
+        exit 1
     fi
 fi
 
 # Activate virtual environment and update dependencies
 print_status "Updating Python dependencies..."
-if [ -f "music-u-env/bin/activate" ]; then
-    source music-u-env/bin/activate
+source music-u-env/bin/activate
+
+if [ $? -eq 0 ] && [ -n "$VIRTUAL_ENV" ]; then
+    print_status "Virtual environment activated: $VIRTUAL_ENV"
+    print_status "Python version: $(python --version)"
     
     # Upgrade pip first
     pip install --upgrade pip
@@ -198,9 +229,21 @@ if [ -f "music-u-env/bin/activate" ]; then
     # Install/update requirements
     pip install -r requirements.txt
 else
-    print_error "Virtual environment activation failed. Attempting direct install..."
+    print_error "Virtual environment activation failed"
+    print_error "Attempting fallback installation..."
+    
+    # Fallback: try user installation
     python3 -m pip install --user --upgrade pip
     python3 -m pip install --user -r requirements.txt
+    
+    if [ $? -ne 0 ]; then
+        print_error "All installation methods failed"
+        print_error "You may need to install dependencies manually:"
+        print_error "  python3 -m venv music-u-env"
+        print_error "  source music-u-env/bin/activate"
+        print_error "  pip install -r requirements.txt"
+        exit 1
+    fi
 fi
 
 # Update Node.js dependencies if needed
