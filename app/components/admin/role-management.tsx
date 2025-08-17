@@ -157,7 +157,7 @@ export default function RoleManagement() {
     setFormData({
       name: role.name,
       description: role.description,
-      permissions: [...role.permissions]
+      permissions: [...(role.permissions || [])]
     });
   };
 
@@ -431,9 +431,9 @@ export default function RoleManagement() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Permissions ({role.permissions.length})</Label>
+                <Label className="text-sm font-medium">Permissions ({role.permissions?.length || 0})</Label>
                 <div className="flex flex-wrap gap-1">
-                  {role.permissions.slice(0, 3).map((permission) => {
+                  {role.permissions?.slice(0, 3).map((permission) => {
                     const permissionInfo = AVAILABLE_PERMISSIONS.find(p => p.id === permission);
                     return (
                       <Badge key={permission} variant="outline" className="text-xs">
@@ -441,9 +441,9 @@ export default function RoleManagement() {
                       </Badge>
                     );
                   })}
-                  {role.permissions.length > 3 && (
+                  {(role.permissions?.length || 0) > 3 && (
                     <Badge variant="outline" className="text-xs">
-                      +{role.permissions.length - 3} more
+                      +{(role.permissions?.length || 0) - 3} more
                     </Badge>
                   )}
                 </div>
