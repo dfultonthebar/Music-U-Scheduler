@@ -121,3 +121,11 @@ INFO:     Finished server process [13100]
 INFO:     Started server process [13103]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/node_modules/flatted/python/flatted.py', 'app/node_modules/plotly.js/.circleci/download_google_fonts.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13103]
+INFO:     Started server process [14015]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
