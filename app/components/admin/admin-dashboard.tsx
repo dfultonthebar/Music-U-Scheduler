@@ -10,13 +10,13 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { apiService } from '@/lib/api';
 import { useSession, signOut } from 'next-auth/react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  BookOpen, 
-  Settings, 
-  FileText, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  Settings,
+  FileText,
+  BarChart3,
   LogOut,
   Music,
   UserCheck,
@@ -28,7 +28,9 @@ import {
   UserPlus,
   GraduationCap,
   RotateCcw,
-  ChevronDown
+  ChevronDown,
+  Download,
+  Monitor
 } from 'lucide-react';
 import { DashboardStats, User, Lesson, AuditLog } from '@/lib/types';
 import { toast } from 'sonner';
@@ -39,6 +41,8 @@ import SystemBackupManager from './system-backup';
 import GitHubUpdates from './github-updates';
 import VersionManagement from './version-management';
 import LessonScheduler from './lesson-scheduler';
+import DataExport from './data-export';
+import YodeckIntegration from './yodeck-integration';
 import { getVersionString, getCurrentVersion } from '@/lib/version';
 
 export default function AdminDashboard() {
@@ -217,6 +221,10 @@ export default function AdminDashboard() {
               <Mail className="w-4 h-4" />
               <span className="hidden sm:inline">Email</span>
             </TabsTrigger>
+            <TabsTrigger value="yodeck" className="flex items-center gap-2 text-xs lg:text-sm">
+              <Monitor className="w-4 h-4" />
+              <span className="hidden sm:inline">Yodeck</span>
+            </TabsTrigger>
             <TabsTrigger value="backup" className="flex items-center gap-2 text-xs lg:text-sm">
               <Database className="w-4 h-4" />
               <span className="hidden sm:inline">Backup</span>
@@ -240,6 +248,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="reports" className="flex items-center gap-2 text-xs lg:text-sm">
               <BarChart3 className="w-4 h-4" />
               <span className="hidden sm:inline">Reports</span>
+            </TabsTrigger>
+            <TabsTrigger value="export" className="flex items-center gap-2 text-xs lg:text-sm">
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
             </TabsTrigger>
           </TabsList>
 
@@ -349,6 +361,11 @@ export default function AdminDashboard() {
           {/* Email Settings Tab */}
           <TabsContent value="email-settings" className="space-y-6">
             <EmailSettings />
+          </TabsContent>
+
+          {/* Yodeck Digital Signage Tab */}
+          <TabsContent value="yodeck" className="space-y-6">
+            <YodeckIntegration />
           </TabsContent>
 
           {/* System Backup Tab */}
@@ -514,14 +531,14 @@ export default function AdminDashboard() {
                     <p className="text-sm text-gray-500 mb-4">View user engagement and activity patterns</p>
                     <Button variant="outline" size="sm">Generate Report</Button>
                   </div>
-                  
+
                   <div className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                     <Calendar className="w-8 h-8 text-green-600 mb-4" />
                     <h3 className="font-medium text-gray-900 mb-2">Lesson Analytics</h3>
                     <p className="text-sm text-gray-500 mb-4">Analyze lesson completion rates and trends</p>
                     <Button variant="outline" size="sm">Generate Report</Button>
                   </div>
-                  
+
                   <div className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                     <TrendingUp className="w-8 h-8 text-purple-600 mb-4" />
                     <h3 className="font-medium text-gray-900 mb-2">Revenue Report</h3>
@@ -531,6 +548,11 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Data Export Tab */}
+          <TabsContent value="export" className="space-y-6">
+            <DataExport />
           </TabsContent>
         </Tabs>
       </div>

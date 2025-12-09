@@ -4,17 +4,29 @@
 Admin API endpoints for Music U Scheduler
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Optional
 from datetime import datetime, timedelta
+import csv
+import io
+import os
+import uuid
+from pathlib import Path
 
 from ...database import get_db
 from ...auth.dependencies import require_admin_role
 from ... import crud, schemas, models
+from ...services.yodeck import YodeckService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Upload directory configuration
+UPLOAD_DIR = Path("/root/Music-U-Scheduler/uploads/profiles")
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 
 # Dashboard
@@ -155,6 +167,117 @@ async def delete_user(
     )
     
     return {"message": f"User {username} deleted successfully"}
+
+
+@router.post("/users/{user_id}/profile-image")
+async def upload_profile_image(
+    user_id: int,
+    file: UploadFile = File(...),
+    request: Request = None,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Upload profile image for a user (admin only)"""
+    # Verify user exists
+    db_user = crud.get_user(db, user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Validate file type
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Read file content to check size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE / 1024 / 1024}MB"
+        )
+
+    # Generate unique filename
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = UPLOAD_DIR / unique_filename
+
+    # Ensure upload directory exists
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Delete old profile image if exists
+    if db_user.profile_image:
+        old_file_path = UPLOAD_DIR / db_user.profile_image
+        if old_file_path.exists():
+            try:
+                old_file_path.unlink()
+            except Exception as e:
+                print(f"Warning: Could not delete old profile image: {e}")
+
+    # Save new file
+    try:
+        with open(file_path, "wb") as f:
+            f.write(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+    # Update user record
+    user_update = schemas.UserUpdate(profile_image=unique_filename)
+    updated_user = crud.update_user(db, user_id, user_update, updated_by=current_user.id)
+
+    # Log the action
+    if request:
+        crud.log_audit_action(
+            db, current_user.id, "UPDATE", "user", user_id,
+            f"Admin uploaded profile image for user: {db_user.username}",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+
+    return {
+        "message": "Profile image uploaded successfully",
+        "filename": unique_filename,
+        "url": f"/uploads/profiles/{unique_filename}"
+    }
+
+
+@router.delete("/users/{user_id}/profile-image")
+async def delete_profile_image(
+    user_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Delete profile image for a user (admin only)"""
+    db_user = crud.get_user(db, user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not db_user.profile_image:
+        raise HTTPException(status_code=404, detail="User has no profile image")
+
+    # Delete file from filesystem
+    file_path = UPLOAD_DIR / db_user.profile_image
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except Exception as e:
+            print(f"Warning: Could not delete profile image file: {e}")
+
+    # Update user record
+    user_update = schemas.UserUpdate(profile_image=None)
+    crud.update_user(db, user_id, user_update, updated_by=current_user.id)
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "DELETE", "user_profile_image", user_id,
+        f"Admin deleted profile image for user: {db_user.username}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return {"message": "Profile image deleted successfully"}
 
 
 @router.post("/users/bulk", response_model=List[schemas.User])
@@ -1653,4 +1776,735 @@ async def create_instructor_exception_admin(
     )
 
     return db_exception
+
+
+# Data Export Endpoints
+@router.get("/export/students")
+async def export_students(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Export all students to CSV"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow([
+        "ID", "Username", "Full Name", "Email", "Phone",
+        "Instrument", "Is Active", "Created At", "Last Login"
+    ])
+
+    # Query students
+    students = db.query(models.User).filter(
+        models.User.role == models.UserRole.STUDENT
+    ).order_by(models.User.created_at.desc()).all()
+
+    # Write data rows
+    for student in students:
+        writer.writerow([
+            student.id,
+            student.username,
+            student.full_name,
+            student.email,
+            student.phone or "",
+            student.instrument or "",
+            "Yes" if student.is_active else "No",
+            student.created_at.strftime("%Y-%m-%d %H:%M:%S") if student.created_at else "",
+            student.last_login.strftime("%Y-%m-%d %H:%M:%S") if student.last_login else ""
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=students_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"}
+    )
+
+
+@router.get("/export/instructors")
+async def export_instructors(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Export all instructors to CSV"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow([
+        "ID", "Username", "Full Name", "Email", "Phone",
+        "Specializations", "Hourly Rate", "Default Break (min)",
+        "Is Active", "Created At", "Last Login"
+    ])
+
+    # Query instructors
+    instructors = db.query(models.User).filter(
+        models.User.role == models.UserRole.INSTRUCTOR
+    ).order_by(models.User.created_at.desc()).all()
+
+    # Write data rows
+    for instructor in instructors:
+        writer.writerow([
+            instructor.id,
+            instructor.username,
+            instructor.full_name,
+            instructor.email,
+            instructor.phone or "",
+            instructor.specializations or "",
+            instructor.hourly_rate or "",
+            instructor.default_break_minutes or 5,
+            "Yes" if instructor.is_active else "No",
+            instructor.created_at.strftime("%Y-%m-%d %H:%M:%S") if instructor.created_at else "",
+            instructor.last_login.strftime("%Y-%m-%d %H:%M:%S") if instructor.last_login else ""
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=instructors_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"}
+    )
+
+
+@router.get("/export/lessons")
+async def export_lessons(
+    date_from: Optional[datetime] = Query(None, description="Start date for lessons export"),
+    date_to: Optional[datetime] = Query(None, description="End date for lessons export"),
+    status: Optional[str] = Query(None, description="Filter by lesson status"),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Export lessons to CSV with optional date range and status filter"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow([
+        "ID", "Title", "Teacher", "Student", "Scheduled At",
+        "Duration (min)", "Break After (min)", "Instrument", "Lesson Type",
+        "Status", "Cost", "Location", "Room Number", "Created At"
+    ])
+
+    # Build query
+    query = db.query(models.Lesson)
+
+    if status:
+        query = query.filter(models.Lesson.status == status)
+    if date_from:
+        query = query.filter(models.Lesson.scheduled_at >= date_from)
+    if date_to:
+        query = query.filter(models.Lesson.scheduled_at <= date_to)
+
+    lessons = query.order_by(models.Lesson.scheduled_at.desc()).all()
+
+    # Write data rows
+    for lesson in lessons:
+        writer.writerow([
+            lesson.id,
+            lesson.title,
+            lesson.teacher.full_name if lesson.teacher else "",
+            lesson.student.full_name if lesson.student else "",
+            lesson.scheduled_at.strftime("%Y-%m-%d %H:%M:%S") if lesson.scheduled_at else "",
+            lesson.duration_minutes or 60,
+            lesson.break_after_minutes or 0,
+            lesson.instrument or "",
+            lesson.lesson_type or "individual",
+            lesson.status.value if lesson.status else "",
+            lesson.cost or "",
+            lesson.location or "",
+            lesson.room_number or "",
+            lesson.created_at.strftime("%Y-%m-%d %H:%M:%S") if lesson.created_at else ""
+        ])
+
+    output.seek(0)
+    filename_parts = ["lessons"]
+    if date_from:
+        filename_parts.append(f"from_{date_from.strftime('%Y%m%d')}")
+    if date_to:
+        filename_parts.append(f"to_{date_to.strftime('%Y%m%d')}")
+    filename = "_".join(filename_parts) + f"_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/export/attendance")
+async def export_attendance(
+    date_from: Optional[datetime] = Query(None, description="Start date for attendance export"),
+    date_to: Optional[datetime] = Query(None, description="End date for attendance export"),
+    instructor_id: Optional[int] = Query(None, description="Filter by instructor ID"),
+    student_id: Optional[int] = Query(None, description="Filter by student ID"),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Export attendance/lesson history to CSV"""
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow([
+        "Lesson ID", "Date", "Time", "Teacher", "Student", "Instrument",
+        "Duration (min)", "Status", "Cost", "Location",
+        "Instructor Notes", "Progress Notes"
+    ])
+
+    # Build query - only completed or cancelled lessons for attendance tracking
+    query = db.query(models.Lesson).filter(
+        models.Lesson.status.in_([models.LessonStatus.COMPLETED, models.LessonStatus.CANCELLED])
+    )
+
+    if date_from:
+        query = query.filter(models.Lesson.scheduled_at >= date_from)
+    if date_to:
+        query = query.filter(models.Lesson.scheduled_at <= date_to)
+    if instructor_id:
+        query = query.filter(models.Lesson.teacher_id == instructor_id)
+    if student_id:
+        query = query.filter(models.Lesson.student_id == student_id)
+
+    lessons = query.order_by(models.Lesson.scheduled_at.desc()).all()
+
+    # Write data rows
+    for lesson in lessons:
+        writer.writerow([
+            lesson.id,
+            lesson.scheduled_at.strftime("%Y-%m-%d") if lesson.scheduled_at else "",
+            lesson.scheduled_at.strftime("%H:%M") if lesson.scheduled_at else "",
+            lesson.teacher.full_name if lesson.teacher else "",
+            lesson.student.full_name if lesson.student else "",
+            lesson.instrument or "",
+            lesson.duration_minutes or 60,
+            lesson.status.value if lesson.status else "",
+            lesson.cost or "",
+            lesson.location or "",
+            lesson.instructor_notes or "",
+            lesson.progress_notes or ""
+        ])
+
+    output.seek(0)
+    filename_parts = ["attendance"]
+    if date_from:
+        filename_parts.append(f"from_{date_from.strftime('%Y%m%d')}")
+    if date_to:
+        filename_parts.append(f"to_{date_to.strftime('%Y%m%d')}")
+    filename = "_".join(filename_parts) + f"_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# Student Registration Management
+@router.get("/registrations/pending", response_model=List[schemas.PendingRegistration])
+async def get_pending_registrations(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all pending student registrations"""
+    registrations = db.query(models.StudentRegistration).filter(
+        models.StudentRegistration.approval_status == models.ApprovalStatus.PENDING
+    ).order_by(models.StudentRegistration.created_at.desc()).all()
+
+    return registrations
+
+
+@router.get("/registrations", response_model=List[schemas.PendingRegistration])
+async def get_all_registrations(
+    status: Optional[str] = Query(None),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all student registrations with optional status filter"""
+    query = db.query(models.StudentRegistration)
+
+    if status:
+        try:
+            status_enum = models.ApprovalStatus(status)
+            query = query.filter(models.StudentRegistration.approval_status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+    registrations = query.order_by(models.StudentRegistration.created_at.desc()).all()
+    return registrations
+
+
+@router.post("/registrations/{registration_id}/approve", response_model=schemas.RegistrationApprovalResponse)
+async def approve_registration(
+    registration_id: int,
+    approval_data: schemas.RegistrationApprovalRequest,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve a pending student registration and create user account
+
+    Args:
+        registration_id: ID of the registration to approve
+        approval_data: Username and password for the new account
+        current_user: Admin user approving the registration
+        db: Database session
+
+    Returns:
+        Approval confirmation with new user ID
+
+    Raises:
+        HTTPException: 404 if registration not found, 400 if already processed
+    """
+    # Get the registration
+    registration = db.query(models.StudentRegistration).filter(
+        models.StudentRegistration.id == registration_id
+    ).first()
+
+    if not registration:
+        raise HTTPException(status_code=404, detail="Registration not found")
+
+    if registration.approval_status != models.ApprovalStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Registration already {registration.approval_status.value}"
+        )
+
+    # Check if username is already taken
+    if crud.get_user_by_username(db, approval_data.username):
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    # Create user account from registration
+    user_data = schemas.UserCreate(
+        email=registration.email,
+        username=approval_data.username,
+        password=approval_data.password,
+        full_name=registration.full_name,
+        role=models.UserRole.STUDENT,
+        is_teacher=False,
+        phone=registration.phone,
+        instrument=registration.instrument,
+        notes=f"Experience: {registration.experience_level}. {registration.notes or ''}".strip()
+    )
+
+    new_user = crud.create_user(db, user_data, created_by=current_user.id)
+
+    # Update registration status
+    registration.approval_status = models.ApprovalStatus.APPROVED
+    registration.approved_user_id = new_user.id
+    db.commit()
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "APPROVE_REGISTRATION", "student_registration", registration.id,
+        f"Admin approved registration for {registration.full_name} (created user {new_user.username})",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    # TODO: Send welcome email to student (if email configured)
+
+    return schemas.RegistrationApprovalResponse(
+        message=f"Registration approved. User account created with username: {new_user.username}",
+        user_id=new_user.id
+    )
+
+
+@router.post("/registrations/{registration_id}/reject")
+async def reject_registration(
+    registration_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject a pending student registration
+
+    Args:
+        registration_id: ID of the registration to reject
+        current_user: Admin user rejecting the registration
+        db: Database session
+
+    Returns:
+        Rejection confirmation
+
+    Raises:
+        HTTPException: 404 if registration not found, 400 if already processed
+    """
+    # Get the registration
+    registration = db.query(models.StudentRegistration).filter(
+        models.StudentRegistration.id == registration_id
+    ).first()
+
+    if not registration:
+        raise HTTPException(status_code=404, detail="Registration not found")
+
+    if registration.approval_status != models.ApprovalStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Registration already {registration.approval_status.value}"
+        )
+
+    # Update registration status
+    registration.approval_status = models.ApprovalStatus.REJECTED
+    db.commit()
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "REJECT_REGISTRATION", "student_registration", registration.id,
+        f"Admin rejected registration for {registration.full_name}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    # TODO: Send rejection email to student (if email configured)
+
+    return {"message": f"Registration rejected for {registration.full_name}"}
+
+
+# Lesson Template Management Endpoints
+@router.get("/lesson-templates", response_model=List[schemas.LessonTemplate])
+async def get_lesson_templates(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    instructor_id: Optional[int] = Query(None),
+    student_id: Optional[int] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all lesson templates with filtering options"""
+    return crud.get_lesson_templates(
+        db,
+        skip=skip,
+        limit=limit,
+        instructor_id=instructor_id,
+        student_id=student_id,
+        is_active=is_active
+    )
+
+
+@router.get("/lesson-templates/{template_id}", response_model=schemas.LessonTemplate)
+async def get_lesson_template(
+    template_id: int,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get a specific lesson template by ID"""
+    template = crud.get_lesson_template(db, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Lesson template not found")
+    return template
+
+
+@router.post("/lesson-templates", response_model=schemas.LessonTemplate)
+async def create_lesson_template(
+    template: schemas.LessonTemplateCreate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Create a new recurring lesson template"""
+    # Verify instructor exists
+    instructor = crud.get_user(db, template.instructor_id)
+    if not instructor or (instructor.role != models.UserRole.INSTRUCTOR and not instructor.is_teacher):
+        raise HTTPException(status_code=400, detail="Invalid instructor ID")
+
+    # Verify student exists
+    student = crud.get_user(db, template.student_id)
+    if not student or student.role != models.UserRole.STUDENT:
+        raise HTTPException(status_code=400, detail="Invalid student ID")
+
+    # Validate day_of_week
+    if template.day_of_week < 0 or template.day_of_week > 6:
+        raise HTTPException(status_code=400, detail="day_of_week must be between 0 (Monday) and 6 (Sunday)")
+
+    db_template = crud.create_lesson_template(db, template, created_by=current_user.id)
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "CREATE", "lesson_template", db_template.id,
+        f"Created lesson template: {instructor.full_name} -> {student.full_name} on {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][template.day_of_week]}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return db_template
+
+
+@router.put("/lesson-templates/{template_id}", response_model=schemas.LessonTemplate)
+async def update_lesson_template(
+    template_id: int,
+    template_update: schemas.LessonTemplateUpdate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Update a lesson template"""
+    db_template = crud.get_lesson_template(db, template_id)
+    if not db_template:
+        raise HTTPException(status_code=404, detail="Lesson template not found")
+
+    # Validate day_of_week if provided
+    if template_update.day_of_week is not None:
+        if template_update.day_of_week < 0 or template_update.day_of_week > 6:
+            raise HTTPException(status_code=400, detail="day_of_week must be between 0 (Monday) and 6 (Sunday)")
+
+    updated_template = crud.update_lesson_template(db, template_id, template_update, updated_by=current_user.id)
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "UPDATE", "lesson_template", template_id,
+        f"Updated lesson template {template_id}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return updated_template
+
+
+@router.delete("/lesson-templates/{template_id}")
+async def delete_lesson_template(
+    template_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Delete a lesson template"""
+    db_template = crud.get_lesson_template(db, template_id)
+    if not db_template:
+        raise HTTPException(status_code=404, detail="Lesson template not found")
+
+    success = crud.delete_lesson_template(db, template_id, deleted_by=current_user.id)
+
+    if success:
+        # Log the action
+        crud.log_audit_action(
+            db, current_user.id, "DELETE", "lesson_template", template_id,
+            f"Deleted lesson template {template_id}",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+        return {"message": "Lesson template deleted successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete lesson template")
+
+
+@router.post("/lesson-templates/generate", response_model=schemas.GenerateLessonsResponse)
+async def generate_lessons_from_templates(
+    request_data: schemas.GenerateLessonsRequest,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate lessons from templates for a specified date range.
+
+    This endpoint creates lesson instances from active recurring templates.
+    It will skip lessons that already exist or conflict with existing lessons.
+    """
+    # Validate date range
+    if request_data.start_date > request_data.end_date:
+        raise HTTPException(status_code=400, detail="start_date must be before or equal to end_date")
+
+    # Generate lessons
+    result = crud.generate_lessons_from_templates(
+        db,
+        request_data.start_date,
+        request_data.end_date,
+        request_data.template_ids,
+        created_by=current_user.id
+    )
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "GENERATE", "lesson_template", None,
+        f"Generated {result['lessons_created']} lessons from templates for {result['date_range']}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return schemas.GenerateLessonsResponse(**result)
+
+
+# Yodeck Digital Signage Integration Endpoints
+@router.get("/yodeck/status", response_model=schemas.YodeckSettingsResponse)
+async def get_yodeck_status(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get Yodeck integration status and settings"""
+    try:
+        yodeck_service = YodeckService(db)
+        status = yodeck_service.get_sync_status()
+
+        # Mask API token for security
+        token_setting = crud.get_system_setting(db, "yodeck_api_token")
+        masked_token = ""
+        if token_setting and token_setting.value:
+            masked_token = "*" * 8 + token_setting.value[-4:] if len(token_setting.value) > 4 else "****"
+
+        return schemas.YodeckSettingsResponse(
+            api_token=masked_token,
+            is_configured=status["is_configured"],
+            last_sync=status["last_sync"],
+            instructor_count=status["instructor_count"],
+            playlist_id=status["playlist_id"]
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching Yodeck status: {str(e)}"
+        )
+
+
+@router.post("/yodeck/settings", response_model=schemas.YodeckSettingsResponse)
+async def save_yodeck_settings(
+    settings: schemas.YodeckSettingsUpdate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Save Yodeck API token"""
+    try:
+        yodeck_service = YodeckService(db)
+        result = yodeck_service.save_api_token(settings.api_token)
+
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+
+        # Log the action
+        crud.log_audit_action(
+            db, current_user.id, "UPDATE", "yodeck_settings", None,
+            "Admin updated Yodeck API token",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+
+        # Get updated status
+        sync_status = yodeck_service.get_sync_status()
+        masked_token = "*" * 8 + settings.api_token[-4:] if len(settings.api_token) > 4 else "****"
+
+        return schemas.YodeckSettingsResponse(
+            api_token=masked_token,
+            is_configured=sync_status["is_configured"],
+            last_sync=sync_status["last_sync"],
+            instructor_count=sync_status["instructor_count"],
+            playlist_id=sync_status["playlist_id"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error saving Yodeck settings: {str(e)}"
+        )
+
+
+@router.post("/yodeck/test-connection", response_model=schemas.YodeckConnectionTestResult)
+async def test_yodeck_connection(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Test connection to Yodeck API"""
+    try:
+        yodeck_service = YodeckService(db)
+        result = await yodeck_service.test_connection()
+
+        return schemas.YodeckConnectionTestResult(
+            success=result["success"],
+            message=result["message"],
+            status=result["status"]
+        )
+    except Exception as e:
+        return schemas.YodeckConnectionTestResult(
+            success=False,
+            message=f"Connection test failed: {str(e)}",
+            status="error"
+        )
+
+
+@router.post("/yodeck/sync-instructors", response_model=schemas.YodeckSyncResponse)
+async def sync_instructors_to_yodeck(
+    sync_request: schemas.YodeckSyncRequest = schemas.YodeckSyncRequest(),
+    request: Request = None,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Sync instructors to Yodeck digital signage"""
+    try:
+        yodeck_service = YodeckService(db)
+
+        if not yodeck_service.is_configured():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Yodeck is not configured. Please add API token first."
+            )
+
+        # Perform sync
+        result = await yodeck_service.sync_instructors()
+
+        # Log the action
+        if request:
+            crud.log_audit_action(
+                db, current_user.id, "SYNC", "yodeck", None,
+                f"Synced {result['synced']} instructors to Yodeck",
+                ip_address=request.client.host,
+                user_agent=request.headers.get("user-agent")
+            )
+
+        return schemas.YodeckSyncResponse(
+            success=result["success"],
+            message=result["message"],
+            synced=result["synced"],
+            failed=result["failed"],
+            total=result.get("total", 0)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error syncing instructors: {str(e)}"
+        )
+
+
+@router.get("/yodeck/instructors", response_model=List[schemas.YodeckInstructorSlide])
+async def get_yodeck_instructor_slides(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get list of instructors with their Yodeck sync status"""
+    try:
+        # Get all active instructors
+        instructors = db.query(models.User).filter(
+            models.User.role == models.UserRole.INSTRUCTOR,
+            models.User.is_active == True
+        ).all()
+
+        slides = []
+        for instructor in instructors:
+            # Parse instruments
+            instruments = []
+            if instructor.specializations:
+                instruments = [s.strip() for s in instructor.specializations.split(',')]
+
+            slides.append(schemas.YodeckInstructorSlide(
+                instructor_id=instructor.id,
+                instructor_name=instructor.full_name,
+                instruments=instruments,
+                bio=instructor.bio,
+                photo_url=instructor.profile_image,
+                sync_status="pending"  # Could be enhanced to track actual sync status
+            ))
+
+        return slides
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching instructor slides: {str(e)}"
+        )
 

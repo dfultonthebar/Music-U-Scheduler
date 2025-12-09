@@ -897,6 +897,306 @@ class APIService {
     if (params.toString()) endpoint += `?${params.toString()}`;
     return await this.makeRequest<any>(endpoint);
   }
+
+  // Data Export
+  async exportData(
+    type: 'students' | 'instructors' | 'lessons' | 'attendance',
+    dateFrom?: Date,
+    dateTo?: Date,
+    status?: string
+  ): Promise<void> {
+    // Ensure we have the latest token
+    await this.syncTokenFromSession();
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    let url = `${API_BASE_URL}/admin/export/${type}`;
+    const params = new URLSearchParams();
+
+    // Add date range parameters for lessons and attendance
+    if ((type === 'lessons' || type === 'attendance') && dateFrom) {
+      params.append('date_from', dateFrom.toISOString());
+    }
+    if ((type === 'lessons' || type === 'attendance') && dateTo) {
+      params.append('date_to', dateTo.toISOString());
+    }
+
+    // Add status filter for lessons
+    if (type === 'lessons' && status) {
+      params.append('status', status);
+    }
+
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    try {
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Export failed' }));
+        throw new Error(errorData.detail || 'Export failed');
+      }
+
+      // Get the filename from Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `${type}_export.csv`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Export error:', error);
+      throw error;
+    }
+  }
+
+  // Student Registration APIs (public, no auth required)
+  async registerStudent(registrationData: {
+    email: string;
+    full_name: string;
+    phone?: string;
+    instrument: string;
+    experience_level: string;
+    notes?: string;
+  }): Promise<{
+    message: string;
+    registration_id: number;
+    approval_status: string;
+  }> {
+    // Don't sync token for public registration endpoint
+    const url = `${API_BASE_URL}/auth/register/student`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(registrationData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Registration failed' }));
+        throw new APIError(response.status, errorData.detail || 'Registration failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError(500, 'Network error occurred');
+    }
+  }
+
+  // Admin Registration Management APIs
+  async getPendingRegistrations(): Promise<any[]> {
+    return await this.makeRequest<any[]>('/admin/registrations/pending');
+  }
+
+  async getAllRegistrations(status?: string): Promise<any[]> {
+    let endpoint = '/admin/registrations';
+    if (status) {
+      endpoint += `?status=${status}`;
+    }
+    return await this.makeRequest<any[]>(endpoint);
+  }
+
+  async approveRegistration(
+    registrationId: number,
+    username: string,
+    password: string
+  ): Promise<{ message: string; user_id?: number }> {
+    return await this.makeRequest<{ message: string; user_id?: number }>(
+      `/admin/registrations/${registrationId}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      }
+    );
+  }
+
+  async rejectRegistration(registrationId: number): Promise<{ message: string }> {
+    return await this.makeRequest<{ message: string }>(
+      `/admin/registrations/${registrationId}/reject`,
+      {
+        method: 'POST'
+      }
+    );
+  }
+
+  // Lesson Template Methods
+  async getLessonTemplates(params?: {
+    instructor_id?: number;
+    student_id?: number;
+    is_active?: boolean;
+  }): Promise<any[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.instructor_id) queryParams.append('instructor_id', params.instructor_id.toString());
+    if (params?.student_id) queryParams.append('student_id', params.student_id.toString());
+    if (params?.is_active !== undefined) queryParams.append('is_active', params.is_active.toString());
+
+    const url = `/admin/lesson-templates${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return this.makeRequest(url);
+  }
+
+  async getLessonTemplate(templateId: number): Promise<any> {
+    return this.makeRequest(`/admin/lesson-templates/${templateId}`);
+  }
+
+  async createLessonTemplate(templateData: {
+    instructor_id: number;
+    student_id: number;
+    day_of_week: number;
+    start_time: string;
+    duration_minutes: number;
+    instrument?: string | null;
+    lesson_type?: string;
+    location?: string | null;
+    room_number?: string | null;
+    is_active?: boolean;
+  }): Promise<any> {
+    return this.makeRequest('/admin/lesson-templates', {
+      method: 'POST',
+      body: JSON.stringify(templateData)
+    });
+  }
+
+  async updateLessonTemplate(templateId: number, updateData: {
+    day_of_week?: number;
+    start_time?: string;
+    duration_minutes?: number;
+    instrument?: string | null;
+    lesson_type?: string;
+    location?: string | null;
+    room_number?: string | null;
+    is_active?: boolean;
+  }): Promise<any> {
+    return this.makeRequest(`/admin/lesson-templates/${templateId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
+  }
+
+  async deleteLessonTemplate(templateId: number): Promise<{ message: string }> {
+    return this.makeRequest(`/admin/lesson-templates/${templateId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async generateLessonsFromTemplates(request: {
+    start_date: string;
+    end_date: string;
+    template_ids?: number[];
+  }): Promise<{
+    lessons_created: number;
+    lessons_skipped: number;
+    date_range: string;
+    details: any[];
+  }> {
+    return this.makeRequest('/admin/lesson-templates/generate', {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+  }
+
+  // Profile Image Upload - Admin endpoints
+  async uploadProfileImage(userId: number, file: File): Promise<{
+    message: string;
+    filename: string;
+    url: string
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return await this.makeRequest(`/admin/users/${userId}/profile-image`, {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  async deleteProfileImage(userId: number): Promise<{ message: string }> {
+    return await this.makeRequest(`/admin/users/${userId}/profile-image`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Profile Image Upload - Instructor endpoints
+  async uploadOwnProfileImage(file: File): Promise<{
+    message: string;
+    filename: string;
+    url: string
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return await this.makeRequest('/instructor/profile/image', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  async deleteOwnProfileImage(): Promise<{ message: string }> {
+    return await this.makeRequest('/instructor/profile/image', {
+      method: 'DELETE',
+    });
+  }
+
+  // Update profile with bio
+  async updateUser(userId: number, updateData: Partial<User>): Promise<User> {
+    return await this.makeRequest(`/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+  }
+
+  // Yodeck Digital Signage Integration
+  async getYodeckStatus(): Promise<any> {
+    return await this.makeRequest('/admin/yodeck/status');
+  }
+
+  async saveYodeckSettings(apiToken: string): Promise<any> {
+    return await this.makeRequest('/admin/yodeck/settings', {
+      method: 'POST',
+      body: JSON.stringify({ api_token: apiToken }),
+    });
+  }
+
+  async testYodeckConnection(): Promise<any> {
+    return await this.makeRequest('/admin/yodeck/test-connection', {
+      method: 'POST',
+    });
+  }
+
+  async syncInstructorsToYodeck(): Promise<any> {
+    return await this.makeRequest('/admin/yodeck/sync-instructors', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  async getYodeckInstructorSlides(): Promise<any[]> {
+    return await this.makeRequest('/admin/yodeck/instructors');
+  }
 }
 
 export const apiService = new APIService();

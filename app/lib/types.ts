@@ -199,3 +199,35 @@ export interface PromoteToAdminData {
   user_id: string;
   maintain_instructor_status?: boolean;
 }
+
+// Yodeck Digital Signage Types
+export interface YodeckStatus {
+  api_token: string;
+  is_configured: boolean;
+  last_sync: string | null;
+  instructor_count: number;
+  playlist_id: string | null;
+}
+
+export interface YodeckConnectionTestResult {
+  success: boolean;
+  message: string;
+  status: string;
+}
+
+export interface YodeckSyncResponse {
+  success: boolean;
+  message: string;
+  synced: number;
+  failed: number;
+  total: number;
+}
+
+export interface YodeckInstructorSlide {
+  instructor_id: number;
+  instructor_name: string;
+  instruments: string[];
+  bio: string | null;
+  photo_url: string | null;
+  sync_status: string;
+}

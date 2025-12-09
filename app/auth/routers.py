@@ -328,3 +328,69 @@ async def verify_reset_token(
         "email_hint": email_hint,
         "message": "Token is valid"
     }
+
+
+@router.post("/register/student", response_model=schemas.StudentRegistrationResponse)
+async def register_student(
+    registration: schemas.StudentRegistrationRequest,
+    db: Session = Depends(get_db)
+) -> Any:
+    """
+    Public endpoint for student self-registration
+
+    Creates a pending registration that requires admin approval.
+    No authentication required.
+
+    Args:
+        registration: Student registration data
+        db: Database session
+
+    Returns:
+        Registration confirmation with pending status
+
+    Raises:
+        HTTPException: 400 if email already registered or pending
+    """
+    # Check if email already exists in users table
+    existing_user = crud.get_user_by_email(db, email=registration.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email already exists. Please log in or use a different email."
+        )
+
+    # Check if email already has a pending registration
+    existing_registration = db.query(models.StudentRegistration).filter(
+        models.StudentRegistration.email == registration.email,
+        models.StudentRegistration.approval_status == models.ApprovalStatus.PENDING
+    ).first()
+
+    if existing_registration:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A registration with this email is already pending approval."
+        )
+
+    # Create new registration request
+    new_registration = models.StudentRegistration(
+        email=registration.email,
+        full_name=registration.full_name,
+        phone=registration.phone,
+        instrument=registration.instrument,
+        experience_level=registration.experience_level,
+        notes=registration.notes,
+        approval_status=models.ApprovalStatus.PENDING
+    )
+
+    db.add(new_registration)
+    db.commit()
+    db.refresh(new_registration)
+
+    # TODO: Send notification email to admin (if email configured)
+    # This would require the email service to be set up
+
+    return schemas.StudentRegistrationResponse(
+        message="Registration submitted successfully! You will be notified when your account is approved.",
+        registration_id=new_registration.id,
+        approval_status=models.ApprovalStatus.PENDING
+    )

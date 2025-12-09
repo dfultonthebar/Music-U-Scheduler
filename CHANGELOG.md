@@ -1,7 +1,67 @@
 
-# 📝 Changelog
+# Changelog
 
 All notable changes to the Music U Scheduler project will be documented in this file.
+
+## [1.5.0] - 2025-12-09
+
+### Major Feature Release - Enhanced Admin & Integration Features
+
+This release adds 6 major new features for improved admin functionality and digital signage integration.
+
+### Added
+- **Data Export (CSV)** - Export students, instructors, lessons, and attendance data to CSV format with date range filtering
+- **Recurring Lesson Templates** - Create reusable lesson templates with recurrence patterns (daily, weekly, bi-weekly, monthly)
+- **Student Self-Registration Portal** - Public registration page at `/register` with admin approval workflow
+- **Instructor Profile Pictures** - Upload and manage profile images for instructors with bio text support
+- **Yodeck Digital Signage Integration** - Connect to Yodeck API to create instructor slideshow cards for digital displays
+- **Registration Approval System** - Admin dashboard for approving/rejecting student registration requests
+
+### New Components
+- `app/components/admin/data-export.tsx` - Data export UI with date pickers and format selection
+- `app/components/admin/lesson-templates.tsx` - Template management with recurrence settings
+- `app/components/admin/registration-approval.tsx` - Registration approval queue
+- `app/components/admin/yodeck-integration.tsx` - Yodeck configuration and sync controls
+- `app/components/shared/profile-image-upload.tsx` - Reusable profile image upload component
+- `app/app/register/page.tsx` - Public student registration page
+- `app/services/yodeck.py` - Yodeck API service class
+
+### New API Endpoints
+- `GET/POST /admin/lesson-templates` - Template CRUD operations
+- `POST /admin/lesson-templates/{id}/generate` - Generate lessons from template
+- `GET /admin/export/students|instructors|lessons|attendance` - CSV export endpoints
+- `GET/POST /admin/yodeck/settings|status|sync-instructors` - Yodeck integration
+- `POST /admin/users/{id}/profile-image` - Profile image upload
+- `POST /auth/register/student` - Public student registration (no auth required)
+- `GET/POST /admin/registrations` - Registration approval management
+
+### Database Changes
+- Added `lesson_templates` table for recurring lesson templates
+- Added `student_registrations` table for registration requests
+- Added `profile_image` and `bio` columns to users table
+
+### Infrastructure
+- Created `/uploads/profiles/` directory for profile image storage
+- Static file serving for uploaded images at `/uploads` route
+
+---
+
+## [1.4.0] - 2025-12-09
+
+### Admin Enhancements & Email Configuration
+
+### Added
+- **Email Server Settings** - Complete SMTP/IMAP configuration with test email functionality
+- **Password Reset System** - Secure token-based password reset with email notifications
+- **Production Service Files** - systemd service files for auto-start on boot
+- **Consolidated Documentation** - Cleaned up redundant documentation files
+
+### Fixed
+- Password reset token validation and expiration handling
+- Email settings persistence in system settings
+- Service auto-restart on failure
+
+---
 
 ## [1.3.02] - 2025-08-17
 

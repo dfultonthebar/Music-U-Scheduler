@@ -12,6 +12,12 @@ class UserRole(str, Enum):
     STUDENT = "student"
 
 
+class ApprovalStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class LessonStatus(str, Enum):
     SCHEDULED = "scheduled"
     COMPLETED = "completed"
@@ -34,6 +40,8 @@ class UserBase(BaseModel):
     specializations: Optional[str] = None  # For instructors: JSON of instruments they teach
     instrument: Optional[str] = None  # For students: primary instrument they're learning
     default_break_minutes: int = 5  # Default break between lessons (0, 5, 10, 15)
+    profile_image: Optional[str] = None  # Filename of profile picture
+    bio: Optional[str] = None  # Instructor biography/description
 
 
 class UserCreate(UserBase):
@@ -62,6 +70,8 @@ class UserUpdate(BaseModel):
     default_break_minutes: Optional[int] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
+    profile_image: Optional[str] = None
+    bio: Optional[str] = None
     
     @validator('password')
     def validate_password(cls, v):
@@ -468,4 +478,151 @@ class SendBulkEmailRequest(BaseModel):
 class EmailTestResult(BaseModel):
     success: bool
     message: str
+
+
+# Student Self-Registration Schemas
+class StudentRegistrationRequest(BaseModel):
+    email: EmailStr
+    full_name: str
+    phone: Optional[str] = None
+    instrument: str  # What they want to learn
+    experience_level: str  # beginner, intermediate, advanced
+    notes: Optional[str] = None  # Additional info
+
+    @validator('experience_level')
+    def validate_experience_level(cls, v):
+        valid_levels = ['beginner', 'intermediate', 'advanced']
+        if v.lower() not in valid_levels:
+            raise ValueError(f'Experience level must be one of: {", ".join(valid_levels)}')
+        return v.lower()
+
+
+class StudentRegistrationResponse(BaseModel):
+    message: str
+    registration_id: int
+    approval_status: ApprovalStatus
+
+
+class PendingRegistration(BaseModel):
+    id: int
+    email: EmailStr
+    full_name: str
+    phone: Optional[str] = None
+    instrument: str
+    experience_level: str
+    notes: Optional[str] = None
+    approval_status: ApprovalStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RegistrationApprovalRequest(BaseModel):
+    username: str  # Username to assign to approved student
+    password: str  # Initial password
+
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
+
+
+class RegistrationApprovalResponse(BaseModel):
+    message: str
+    user_id: Optional[int] = None
+
+
+# Lesson Template Schemas
+class LessonTemplateBase(BaseModel):
+    instructor_id: int
+    student_id: int
+    day_of_week: int  # 0=Monday, 6=Sunday
+    start_time: time
+    duration_minutes: int = 30
+    instrument: Optional[str] = None
+    lesson_type: str = "individual"
+    location: Optional[str] = None
+    room_number: Optional[str] = None
+    is_active: bool = True
+
+
+class LessonTemplateCreate(LessonTemplateBase):
+    pass
+
+
+class LessonTemplateUpdate(BaseModel):
+    day_of_week: Optional[int] = None
+    start_time: Optional[time] = None
+    duration_minutes: Optional[int] = None
+    instrument: Optional[str] = None
+    lesson_type: Optional[str] = None
+    location: Optional[str] = None
+    room_number: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class LessonTemplate(LessonTemplateBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    instructor: UserSummary
+    student: UserSummary
+
+    class Config:
+        from_attributes = True
+
+
+class GenerateLessonsRequest(BaseModel):
+    start_date: date
+    end_date: date
+    template_ids: Optional[List[int]] = None  # If None, generate from all active templates
+
+
+class GenerateLessonsResponse(BaseModel):
+    lessons_created: int
+    lessons_skipped: int
+    date_range: str
+    details: List[Dict[str, Any]] = []
+
+
+# Yodeck Digital Signage Schemas
+class YodeckSettingsUpdate(BaseModel):
+    api_token: str
+
+
+class YodeckSettingsResponse(BaseModel):
+    api_token: str  # Will be masked in response
+    is_configured: bool
+    last_sync: Optional[datetime] = None
+    instructor_count: int
+    playlist_id: Optional[str] = None
+
+
+class YodeckConnectionTestResult(BaseModel):
+    success: bool
+    message: str
+    status: str  # not_configured, connected, unauthorized, timeout, error
+
+
+class YodeckSyncRequest(BaseModel):
+    instructor_ids: Optional[List[int]] = None  # If None, sync all instructors
+
+
+class YodeckSyncResponse(BaseModel):
+    success: bool
+    message: str
+    synced: int
+    failed: int
+    total: int
+
+
+class YodeckInstructorSlide(BaseModel):
+    instructor_id: int
+    instructor_name: str
+    instruments: List[str]
+    bio: Optional[str] = None
+    photo_url: Optional[str] = None
+    sync_status: str  # pending, synced, failed
 

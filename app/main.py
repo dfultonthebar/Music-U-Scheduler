@@ -30,6 +30,7 @@ app.add_middleware(
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/uploads", StaticFiles(directory="/root/Music-U-Scheduler/uploads"), name="uploads")
 
 # Include routers
 app.include_router(auth_router)

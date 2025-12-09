@@ -4,18 +4,26 @@
 Instructor API endpoints for Music U Scheduler
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta, date, time
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload
+import os
+import uuid
+from pathlib import Path
 
 from ...database import get_db
 from ...auth.dependencies import require_instructor_role, require_teacher_role
 from ... import crud, schemas, models
 
 router = APIRouter(prefix="/instructor", tags=["instructor"])
+
+# Upload directory configuration
+UPLOAD_DIR = Path("/root/Music-U-Scheduler/uploads/profiles")
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 
 # Dashboard
@@ -70,6 +78,106 @@ async def update_instructor_profile(
     )
     
     return updated_user
+
+
+@router.post("/profile/image")
+async def upload_own_profile_image(
+    file: UploadFile = File(...),
+    request: Request = None,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Upload profile image for current instructor"""
+    # Validate file type
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Read file content to check size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE / 1024 / 1024}MB"
+        )
+
+    # Generate unique filename
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = UPLOAD_DIR / unique_filename
+
+    # Ensure upload directory exists
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Delete old profile image if exists
+    if current_user.profile_image:
+        old_file_path = UPLOAD_DIR / current_user.profile_image
+        if old_file_path.exists():
+            try:
+                old_file_path.unlink()
+            except Exception as e:
+                print(f"Warning: Could not delete old profile image: {e}")
+
+    # Save new file
+    try:
+        with open(file_path, "wb") as f:
+            f.write(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+
+    # Update user record
+    user_update = schemas.UserUpdate(profile_image=unique_filename)
+    updated_user = crud.update_user(db, current_user.id, user_update, updated_by=current_user.id)
+
+    # Log the action
+    if request:
+        crud.log_audit_action(
+            db, current_user.id, "UPDATE", "user", current_user.id,
+            f"Instructor uploaded own profile image",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+
+    return {
+        "message": "Profile image uploaded successfully",
+        "filename": unique_filename,
+        "url": f"/uploads/profiles/{unique_filename}"
+    }
+
+
+@router.delete("/profile/image")
+async def delete_own_profile_image(
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Delete profile image for current instructor"""
+    if not current_user.profile_image:
+        raise HTTPException(status_code=404, detail="No profile image to delete")
+
+    # Delete file from filesystem
+    file_path = UPLOAD_DIR / current_user.profile_image
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except Exception as e:
+            print(f"Warning: Could not delete profile image file: {e}")
+
+    # Update user record
+    user_update = schemas.UserUpdate(profile_image=None)
+    crud.update_user(db, current_user.id, user_update, updated_by=current_user.id)
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "DELETE", "user_profile_image", current_user.id,
+        f"Instructor deleted own profile image",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return {"message": "Profile image deleted successfully"}
 
 
 # Lesson Management

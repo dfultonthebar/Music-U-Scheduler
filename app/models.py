@@ -13,6 +13,12 @@ class UserRole(str, enum.Enum):
     STUDENT = "student"
 
 
+class ApprovalStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class LessonStatus(str, enum.Enum):
     SCHEDULED = "scheduled"
     COMPLETED = "completed"
@@ -49,6 +55,8 @@ class User(Base):
     specializations = Column(Text, nullable=True)  # JSON string of instruments/skills for instructors
     instrument = Column(String, nullable=True)  # Primary instrument for students
     default_break_minutes = Column(Integer, default=5)  # Default break between lessons (0, 5, 10, 15)
+    profile_image = Column(String, nullable=True)  # Filename of profile picture
+    bio = Column(Text, nullable=True)  # Instructor biography/description
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
@@ -168,4 +176,47 @@ class PasswordResetToken(Base):
 
     # Relationships
     user = relationship("User", backref="password_reset_tokens")
+
+
+class LessonTemplate(Base):
+    """Recurring lesson templates for automatic lesson generation"""
+    __tablename__ = "lesson_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)  # 0=Monday, 6=Sunday
+    start_time = Column(Time, nullable=False)
+    duration_minutes = Column(Integer, default=30)
+    instrument = Column(String, nullable=True)
+    lesson_type = Column(String, default="individual")
+    location = Column(String, nullable=True)
+    room_number = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    instructor = relationship("User", foreign_keys=[instructor_id], backref="template_lessons_taught")
+    student = relationship("User", foreign_keys=[student_id], backref="template_lessons_taken")
+
+
+class StudentRegistration(Base):
+    """Pending student registration requests"""
+    __tablename__ = "student_registrations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    instrument = Column(String, nullable=False)
+    experience_level = Column(String, nullable=False)
+    notes = Column(Text, nullable=True)
+    approval_status = Column(Enum(ApprovalStatus), default=ApprovalStatus.PENDING)
+    approved_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Set when approved
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    approved_user = relationship("User", backref="registration_requests")
 

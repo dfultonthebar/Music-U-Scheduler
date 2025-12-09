@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc, asc
+from sqlalchemy import and_, or_, func, desc, asc, String
 from . import models, schemas
 from .auth.utils import get_password_hash
 from datetime import datetime, timedelta
@@ -947,3 +947,255 @@ def get_instructor_schedule_for_date_range(db: Session, instructor_id: int,
         current_date = current_date + timedelta(days=1)
 
     return schedule
+
+
+# Lesson Template CRUD Operations
+def get_lesson_template(db: Session, template_id: int):
+    """Get a lesson template by ID"""
+    return db.query(models.LessonTemplate).options(
+        joinedload(models.LessonTemplate.instructor),
+        joinedload(models.LessonTemplate.student)
+    ).filter(models.LessonTemplate.id == template_id).first()
+
+
+def get_lesson_templates(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    instructor_id: Optional[int] = None,
+    student_id: Optional[int] = None,
+    is_active: Optional[bool] = None
+):
+    """Get all lesson templates with optional filtering"""
+    query = db.query(models.LessonTemplate).options(
+        joinedload(models.LessonTemplate.instructor),
+        joinedload(models.LessonTemplate.student)
+    )
+
+    if instructor_id is not None:
+        query = query.filter(models.LessonTemplate.instructor_id == instructor_id)
+    if student_id is not None:
+        query = query.filter(models.LessonTemplate.student_id == student_id)
+    if is_active is not None:
+        query = query.filter(models.LessonTemplate.is_active == is_active)
+
+    return query.offset(skip).limit(limit).all()
+
+
+def create_lesson_template(
+    db: Session,
+    template: schemas.LessonTemplateCreate,
+    created_by: Optional[int] = None
+):
+    """Create a new lesson template"""
+    db_template = models.LessonTemplate(
+        instructor_id=template.instructor_id,
+        student_id=template.student_id,
+        day_of_week=template.day_of_week,
+        start_time=template.start_time,
+        duration_minutes=template.duration_minutes,
+        instrument=template.instrument,
+        lesson_type=template.lesson_type,
+        location=template.location,
+        room_number=template.room_number,
+        is_active=template.is_active
+    )
+    db.add(db_template)
+    db.commit()
+    db.refresh(db_template)
+
+    # Log the creation
+    if created_by:
+        log_audit_action(
+            db, created_by, "CREATE", "lesson_template", db_template.id,
+            f"Created lesson template for instructor {template.instructor_id} and student {template.student_id}"
+        )
+
+    return db_template
+
+
+def update_lesson_template(
+    db: Session,
+    template_id: int,
+    template_update: schemas.LessonTemplateUpdate,
+    updated_by: Optional[int] = None
+):
+    """Update a lesson template"""
+    db_template = db.query(models.LessonTemplate).filter(
+        models.LessonTemplate.id == template_id
+    ).first()
+
+    if db_template:
+        update_data = template_update.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_template, field, value)
+
+        db_template.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(db_template)
+
+        # Log the update
+        if updated_by:
+            log_audit_action(
+                db, updated_by, "UPDATE", "lesson_template", db_template.id,
+                f"Updated lesson template {template_id}"
+            )
+
+    return db_template
+
+
+def delete_lesson_template(
+    db: Session,
+    template_id: int,
+    deleted_by: Optional[int] = None
+):
+    """Delete a lesson template"""
+    db_template = db.query(models.LessonTemplate).filter(
+        models.LessonTemplate.id == template_id
+    ).first()
+
+    if db_template:
+        # Log the deletion before removing
+        if deleted_by:
+            log_audit_action(
+                db, deleted_by, "DELETE", "lesson_template", template_id,
+                f"Deleted lesson template for instructor {db_template.instructor_id} and student {db_template.student_id}"
+            )
+
+        db.delete(db_template)
+        db.commit()
+        return True
+
+    return False
+
+
+def generate_lessons_from_templates(
+    db: Session,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    template_ids: Optional[List[int]] = None,
+    created_by: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Generate lessons from templates for a date range.
+
+    Args:
+        db: Database session
+        start_date: Start date for lesson generation
+        end_date: End date for lesson generation
+        template_ids: Optional list of specific template IDs to use. If None, uses all active templates.
+        created_by: ID of the user creating the lessons
+
+    Returns:
+        Dictionary with creation statistics and details
+    """
+    from datetime import datetime as dt, time as dt_time
+
+    # Get templates to process
+    query = db.query(models.LessonTemplate).options(
+        joinedload(models.LessonTemplate.instructor),
+        joinedload(models.LessonTemplate.student)
+    ).filter(models.LessonTemplate.is_active == True)
+
+    if template_ids:
+        query = query.filter(models.LessonTemplate.id.in_(template_ids))
+
+    templates = query.all()
+
+    lessons_created = 0
+    lessons_skipped = 0
+    details = []
+
+    # Iterate through each template
+    for template in templates:
+        current_date = start_date
+
+        # Iterate through each day in the range
+        while current_date <= end_date:
+            # Check if this day matches the template's day of week
+            # Python's weekday() returns 0=Monday, 6=Sunday (same as our model)
+            if current_date.weekday() == template.day_of_week:
+                # Combine date and time to create scheduled datetime
+                scheduled_at = dt.combine(current_date, template.start_time)
+
+                # Check if a lesson already exists at this time
+                existing_lesson = db.query(models.Lesson).filter(
+                    and_(
+                        models.Lesson.teacher_id == template.instructor_id,
+                        models.Lesson.student_id == template.student_id,
+                        models.Lesson.scheduled_at == scheduled_at
+                    )
+                ).first()
+
+                if existing_lesson:
+                    lessons_skipped += 1
+                    details.append({
+                        "date": current_date.isoformat(),
+                        "template_id": template.id,
+                        "status": "skipped",
+                        "reason": "Lesson already exists"
+                    })
+                else:
+                    # Check for scheduling conflicts
+                    end_time = scheduled_at + timedelta(minutes=template.duration_minutes)
+
+                    # Check for overlapping lessons
+                    conflicting_lesson = db.query(models.Lesson).filter(
+                        and_(
+                            models.Lesson.teacher_id == template.instructor_id,
+                            models.Lesson.scheduled_at < end_time,
+                            func.datetime(
+                                models.Lesson.scheduled_at,
+                                '+' + func.cast(models.Lesson.duration_minutes, String) + ' minutes'
+                            ) > scheduled_at
+                        )
+                    ).first()
+
+                    if conflicting_lesson:
+                        lessons_skipped += 1
+                        details.append({
+                            "date": current_date.isoformat(),
+                            "template_id": template.id,
+                            "status": "skipped",
+                            "reason": f"Conflicts with lesson ID {conflicting_lesson.id}"
+                        })
+                    else:
+                        # Create the lesson
+                        lesson_data = schemas.LessonCreate(
+                            title=f"{template.instrument or 'Music'} Lesson",
+                            description=f"Recurring lesson from template {template.id}",
+                            teacher_id=template.instructor_id,
+                            student_id=template.student_id,
+                            scheduled_at=scheduled_at,
+                            duration_minutes=template.duration_minutes,
+                            break_after_minutes=0,  # Can be set based on instructor defaults
+                            instrument=template.instrument,
+                            lesson_type=template.lesson_type,
+                            location=template.location,
+                            room_number=template.room_number
+                        )
+
+                        new_lesson = create_lesson(db, lesson_data, created_by=created_by)
+                        lessons_created += 1
+                        details.append({
+                            "date": current_date.isoformat(),
+                            "template_id": template.id,
+                            "lesson_id": new_lesson.id,
+                            "status": "created"
+                        })
+
+            current_date = current_date + timedelta(days=1)
+
+    # Log the bulk generation
+    if created_by:
+        log_audit_action(
+            db, created_by, "BULK_CREATE", "lesson", None,
+            f"Generated {lessons_created} lessons from templates ({lessons_skipped} skipped)"
+        )
+
+    return {
+        "lessons_created": lessons_created,
+        "lessons_skipped": lessons_skipped,
+        "date_range": f"{start_date.isoformat()} to {end_date.isoformat()}",
+        "details": details
+    }

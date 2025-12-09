@@ -176,8 +176,14 @@ export default function LoginForm() {
             </form>
           </CardContent>
 
-          <CardFooter className="text-center">
-            <p className="text-sm text-gray-500">
+          <CardFooter className="flex flex-col gap-3 text-center border-t pt-6">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <a href="/register" className="text-blue-600 hover:text-blue-800 hover:underline font-medium">
+                Register as a Student
+              </a>
+            </p>
+            <p className="text-xs text-gray-500">
               Music-U-Scheduler • Lesson Management System
             </p>
           </CardFooter>
