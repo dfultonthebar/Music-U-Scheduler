@@ -6,6 +6,7 @@ Admin API endpoints for Music U Scheduler
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_
 from typing import List, Optional
 from datetime import datetime, timedelta
 
@@ -866,21 +867,20 @@ async def delete_instructor_role(
 
 
 # Email Settings Endpoints
-@router.get("/email-settings")
+@router.get("/email-settings", response_model=schemas.EmailSettingsResponse)
 async def get_email_settings(
-    current_user: models.User = Depends(require_admin_role)
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
 ):
     """Get current email server settings"""
+    from ...services.email import EmailService
+
     try:
-        # Return mock email settings (can be expanded to use real settings)
-        settings = {
-            "smtp_server": "smtp.gmail.com",
-            "smtp_port": 587,
-            "use_tls": True,
-            "sender_email": "noreply@musicu.com",
-            "sender_name": "Music U Scheduler"
-        }
-        return settings
+        email_service = EmailService(db)
+        settings = email_service.get_settings()
+        safe_settings = settings.to_safe_dict()
+        safe_settings["is_configured"] = email_service.is_configured()
+        return safe_settings
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -888,24 +888,151 @@ async def get_email_settings(
         )
 
 
-@router.put("/email-settings")
+@router.put("/email-settings", response_model=schemas.EmailSettingsResponse)
 async def update_email_settings(
-    settings_data: dict,
-    current_user: models.User = Depends(require_admin_role)
+    settings_data: schemas.EmailSettingsUpdate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
 ):
     """Update email server settings"""
+    from ...services.email import EmailService
+
     try:
-        # For now, just return success (can be expanded to store in database)
-        return {
-            "status": "success",
-            "message": "Email settings updated successfully",
-            "settings": settings_data
-        }
+        email_service = EmailService(db)
+
+        # Convert to dict, excluding None values
+        updates = {k: v for k, v in settings_data.dict().items() if v is not None}
+
+        updated_settings = email_service.update_settings(updates)
+
+        # Log the action
+        crud.log_audit_action(
+            db, current_user.id, "UPDATE", "email_settings", None,
+            "Admin updated email settings",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+
+        safe_settings = updated_settings.to_safe_dict()
+        safe_settings["is_configured"] = email_service.is_configured()
+        return safe_settings
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating email settings: {str(e)}"
         )
+
+
+@router.post("/email-settings/test", response_model=schemas.EmailTestResult)
+async def test_email_connection(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Test SMTP connection with current settings"""
+    from ...services.email import EmailService
+
+    try:
+        email_service = EmailService(db)
+        result = email_service.test_connection()
+        return result
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Connection test failed: {str(e)}"
+        }
+
+
+@router.post("/email-settings/send-test")
+async def send_test_email(
+    to_email: str = Query(..., description="Email address to send test to"),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Send a test email to verify settings"""
+    from ...services.email import EmailService
+
+    try:
+        email_service = EmailService(db)
+
+        if not email_service.is_configured():
+            return {
+                "success": False,
+                "message": "Email settings not configured. Please configure SMTP settings first."
+            }
+
+        result = email_service.send_email(
+            to_email=to_email,
+            subject="Test Email - Music U Scheduler",
+            body_text="This is a test email from Music U Scheduler. If you received this, your email settings are working correctly!",
+            body_html="""
+            <html>
+            <body style="font-family: Arial, sans-serif; padding: 20px;">
+                <h2 style="color: #2563eb;">Test Email</h2>
+                <p>This is a test email from <strong>Music U Scheduler</strong>.</p>
+                <p>If you received this, your email settings are working correctly!</p>
+                <hr style="border: 1px solid #e5e7eb; margin: 20px 0;">
+                <p style="color: #6b7280; font-size: 12px;">This is an automated test message.</p>
+            </body>
+            </html>
+            """
+        )
+        return result
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Failed to send test email: {str(e)}"
+        }
+
+
+@router.post("/email/send")
+async def send_email(
+    email_request: schemas.SendEmailRequest,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Send an email to a single recipient"""
+    from ...services.email import EmailService
+
+    try:
+        email_service = EmailService(db)
+        result = email_service.send_email(
+            to_email=email_request.to_email,
+            subject=email_request.subject,
+            body_text=email_request.body_text,
+            body_html=email_request.body_html
+        )
+        return result
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Failed to send email: {str(e)}"
+        }
+
+
+@router.post("/email/send-bulk")
+async def send_bulk_email(
+    email_request: schemas.SendBulkEmailRequest,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Send an email to multiple recipients"""
+    from ...services.email import EmailService
+
+    try:
+        email_service = EmailService(db)
+        result = email_service.send_bulk_emails(
+            recipients=email_request.recipients,
+            subject=email_request.subject,
+            body_text=email_request.body_text,
+            body_html=email_request.body_html
+        )
+        return result
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Failed to send bulk email: {str(e)}"
+        }
 
 
 # Backup Management Endpoints
@@ -1078,7 +1205,7 @@ async def get_version_info(
             "status": "production",
             "features": [
                 "Authentication Integration",
-                "User Management", 
+                "User Management",
                 "Lesson Scheduling",
                 "Admin Dashboard",
                 "Backup System"
@@ -1089,4 +1216,441 @@ async def get_version_info(
             status_code=500,
             detail=f"Error getting version info: {str(e)}"
         )
+
+
+# Get students assigned to an instructor (based on lesson history)
+@router.get("/instructors/{instructor_id}/students")
+async def get_instructor_students(
+    instructor_id: int,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get students who have lessons with this instructor"""
+    # Verify instructor exists
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR and not instructor.is_teacher:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    # Get unique students who have had lessons with this instructor
+    student_ids = db.query(models.Lesson.student_id).filter(
+        models.Lesson.teacher_id == instructor_id
+    ).distinct().all()
+
+    student_ids = [s[0] for s in student_ids]
+
+    students = []
+    for student_id in student_ids:
+        student = crud.get_user(db, student_id)
+        if student and student.is_active:
+            students.append({
+                "id": student.id,
+                "full_name": student.full_name,
+                "email": student.email,
+                "username": student.username
+            })
+
+    return {
+        "instructor_id": instructor_id,
+        "instructor_name": instructor.full_name,
+        "students": students,
+        "student_count": len(students)
+    }
+
+
+# Get all students (for adding new student-instructor assignments)
+@router.get("/students")
+async def get_all_students(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all students in the system"""
+    students = db.query(models.User).filter(
+        models.User.role == models.UserRole.STUDENT,
+        models.User.is_active == True
+    ).all()
+
+    return [
+        {
+            "id": s.id,
+            "full_name": s.full_name,
+            "email": s.email,
+            "username": s.username
+        }
+        for s in students
+    ]
+
+
+# Get all instructors with their availability status
+@router.get("/instructors")
+async def get_all_instructors(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all instructors with their availability info"""
+    instructors = db.query(models.User).filter(
+        or_(
+            models.User.role == models.UserRole.INSTRUCTOR,
+            models.User.is_teacher == True
+        ),
+        models.User.is_active == True
+    ).all()
+
+    result = []
+    for instructor in instructors:
+        # Check if they have availability set up
+        availability_count = db.query(models.InstructorAvailability).filter(
+            models.InstructorAvailability.instructor_id == instructor.id,
+            models.InstructorAvailability.is_active == True
+        ).count()
+
+        # Get count of students they teach
+        student_count = db.query(models.Lesson.student_id).filter(
+            models.Lesson.teacher_id == instructor.id
+        ).distinct().count()
+
+        result.append({
+            "id": instructor.id,
+            "full_name": instructor.full_name,
+            "email": instructor.email,
+            "username": instructor.username,
+            "default_break_minutes": instructor.default_break_minutes or 5,
+            "has_availability": availability_count > 0,
+            "availability_slots": availability_count,
+            "student_count": student_count,
+            "specializations": instructor.specializations
+        })
+
+    return result
+
+
+# Scheduling and Availability Endpoints
+@router.get("/scheduling/instructors/{instructor_id}/availability")
+async def get_instructor_availability_admin(
+    instructor_id: int,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get an instructor's availability settings (admin view)"""
+    # Verify instructor exists
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    availability_slots = crud.get_instructor_availability_slots(db, instructor_id, is_active=True)
+
+    return {
+        "instructor_id": instructor_id,
+        "instructor_name": instructor.full_name,
+        "default_break_minutes": instructor.default_break_minutes or 5,
+        "availability": availability_slots
+    }
+
+
+@router.get("/scheduling/instructors/{instructor_id}/exceptions")
+async def get_instructor_exceptions_admin(
+    instructor_id: int,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get an instructor's days off and exceptions (admin view)"""
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    exceptions = crud.get_instructor_exceptions(db, instructor_id, date_from=date_from, date_to=date_to)
+
+    return {
+        "instructor_id": instructor_id,
+        "instructor_name": instructor.full_name,
+        "exceptions": exceptions
+    }
+
+
+@router.get("/scheduling/instructors/{instructor_id}/schedule")
+async def get_instructor_schedule_admin(
+    instructor_id: int,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get an instructor's full schedule including availability, exceptions, and lessons"""
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    if not date_from:
+        date_from = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    if not date_to:
+        date_to = date_from + timedelta(days=30)
+
+    schedule = crud.get_instructor_schedule_for_date_range(db, instructor_id, date_from, date_to)
+
+    return {
+        "instructor_id": instructor_id,
+        "instructor_name": instructor.full_name,
+        "default_break_minutes": instructor.default_break_minutes or 5,
+        "date_range": {
+            "from": date_from.isoformat(),
+            "to": date_to.isoformat()
+        },
+        "schedule": schedule
+    }
+
+
+@router.post("/scheduling/validate")
+async def validate_lesson_time(
+    instructor_id: int = Query(..., description="Instructor ID"),
+    scheduled_at: datetime = Query(..., description="Proposed start time"),
+    duration_minutes: int = Query(60, ge=15, le=120, description="Lesson duration in minutes"),
+    break_after_minutes: int = Query(0, ge=0, le=15, description="Break time after lesson"),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate if a proposed lesson time is available.
+    Returns validation result with any conflicts.
+    """
+    # Verify instructor exists
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    # Calculate end time
+    proposed_end = scheduled_at + timedelta(minutes=duration_minutes + break_after_minutes)
+
+    # Validate the time
+    validation_result = crud.check_instructor_availability_for_time(
+        db, instructor_id, scheduled_at, proposed_end
+    )
+
+    return {
+        "instructor_id": instructor_id,
+        "instructor_name": instructor.full_name,
+        "proposed_time": {
+            "start": scheduled_at.isoformat(),
+            "end": (scheduled_at + timedelta(minutes=duration_minutes)).isoformat(),
+            "duration_minutes": duration_minutes,
+            "break_after_minutes": break_after_minutes
+        },
+        "is_valid": validation_result["is_valid"],
+        "conflicts": validation_result["conflicts"]
+    }
+
+
+@router.get("/scheduling/available-slots")
+async def get_available_slots(
+    instructor_id: int = Query(..., description="Instructor ID"),
+    target_date: datetime = Query(..., description="Date to check availability"),
+    duration_minutes: int = Query(60, ge=15, le=120, description="Lesson duration in minutes"),
+    break_minutes: int = Query(0, ge=0, le=15, description="Break time after lesson"),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """
+    Get available time slots for an instructor on a specific date.
+    Returns list of available start times in 5-minute increments.
+    """
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    available_slots = crud.get_available_time_slots(
+        db, instructor_id, target_date, duration_minutes, break_minutes
+    )
+
+    return {
+        "instructor_id": instructor_id,
+        "instructor_name": instructor.full_name,
+        "date": target_date.date().isoformat(),
+        "duration_minutes": duration_minutes,
+        "break_minutes": break_minutes,
+        "available_slots": available_slots,
+        "slot_count": len(available_slots)
+    }
+
+
+@router.post("/scheduling/lessons", response_model=schemas.Lesson)
+async def create_lesson_with_validation(
+    lesson: schemas.LessonCreate,
+    request: Request,
+    validate: bool = Query(True, description="Validate against instructor availability"),
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new lesson with optional availability validation.
+    If validate=True, will check for conflicts before creating.
+    """
+    # Verify teacher and student exist
+    teacher = crud.get_user(db, lesson.teacher_id)
+    if not teacher or (teacher.role != models.UserRole.INSTRUCTOR and not teacher.is_teacher):
+        raise HTTPException(status_code=400, detail="Invalid teacher ID")
+
+    student = crud.get_user(db, lesson.student_id)
+    if not student:
+        raise HTTPException(status_code=400, detail="Invalid student ID")
+
+    # Apply instructor's default break time if not specified
+    if lesson.break_after_minutes == 0 and teacher.default_break_minutes:
+        lesson.break_after_minutes = teacher.default_break_minutes
+
+    # Validate if requested
+    if validate:
+        proposed_end = lesson.scheduled_at + timedelta(
+            minutes=lesson.duration_minutes + lesson.break_after_minutes
+        )
+        validation_result = crud.check_instructor_availability_for_time(
+            db, lesson.teacher_id, lesson.scheduled_at, proposed_end
+        )
+
+        if not validation_result["is_valid"]:
+            conflict_messages = [c["message"] for c in validation_result["conflicts"]]
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Scheduling conflict detected",
+                    "conflicts": validation_result["conflicts"],
+                    "summary": "; ".join(conflict_messages)
+                }
+            )
+
+    # Create the lesson
+    db_lesson = crud.create_lesson(db, lesson, created_by=current_user.id)
+
+    crud.log_audit_action(
+        db, current_user.id, "CREATE", "lesson", db_lesson.id,
+        f"Admin created lesson: {db_lesson.title} (validated: {validate})",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return db_lesson
+
+
+@router.get("/scheduling/duration-options")
+async def get_duration_options(
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Get available lesson duration options (in 5-minute increments)"""
+    return {
+        "duration_options": [
+            {"minutes": 15, "label": "15 min"},
+            {"minutes": 20, "label": "20 min"},
+            {"minutes": 25, "label": "25 min"},
+            {"minutes": 30, "label": "30 min"},
+            {"minutes": 35, "label": "35 min"},
+            {"minutes": 40, "label": "40 min"},
+            {"minutes": 45, "label": "45 min"},
+            {"minutes": 50, "label": "50 min"},
+            {"minutes": 55, "label": "55 min"},
+            {"minutes": 60, "label": "1 hour"},
+            {"minutes": 65, "label": "1h 5m"},
+            {"minutes": 70, "label": "1h 10m"},
+            {"minutes": 75, "label": "1h 15m"},
+            {"minutes": 80, "label": "1h 20m"},
+            {"minutes": 85, "label": "1h 25m"},
+            {"minutes": 90, "label": "1h 30m"},
+            {"minutes": 95, "label": "1h 35m"},
+            {"minutes": 100, "label": "1h 40m"},
+            {"minutes": 105, "label": "1h 45m"},
+            {"minutes": 110, "label": "1h 50m"},
+            {"minutes": 115, "label": "1h 55m"},
+            {"minutes": 120, "label": "2 hours"}
+        ],
+        "break_options": [
+            {"minutes": 0, "label": "No break"},
+            {"minutes": 5, "label": "5 min"},
+            {"minutes": 10, "label": "10 min"},
+            {"minutes": 15, "label": "15 min"}
+        ],
+        "default_duration": 60,
+        "min_duration": 15,
+        "max_duration": 120
+    }
+
+
+# Admin can also manage instructor availability
+@router.post("/scheduling/instructors/{instructor_id}/availability")
+async def create_instructor_availability_admin(
+    instructor_id: int,
+    availability: schemas.InstructorAvailabilityCreate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Create availability slot for an instructor (admin)"""
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    if availability.day_of_week < 0 or availability.day_of_week > 6:
+        raise HTTPException(status_code=400, detail="day_of_week must be between 0 and 6")
+    if availability.start_time >= availability.end_time:
+        raise HTTPException(status_code=400, detail="start_time must be before end_time")
+
+    db_availability = crud.create_instructor_availability(
+        db, instructor_id, availability, created_by=current_user.id
+    )
+
+    crud.log_audit_action(
+        db, current_user.id, "CREATE", "instructor_availability", db_availability.id,
+        f"Admin created availability for instructor {instructor.username}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return db_availability
+
+
+@router.post("/scheduling/instructors/{instructor_id}/exceptions")
+async def create_instructor_exception_admin(
+    instructor_id: int,
+    exception: schemas.AvailabilityExceptionCreate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Create day off/exception for an instructor (admin)"""
+    instructor = crud.get_user(db, instructor_id)
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+    if instructor.role != models.UserRole.INSTRUCTOR:
+        raise HTTPException(status_code=400, detail="User is not an instructor")
+
+    existing = crud.get_exception_for_date(db, instructor_id, exception.exception_date)
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"An exception already exists for {exception.exception_date}"
+        )
+
+    db_exception = crud.create_availability_exception(
+        db, instructor_id, exception, created_by=current_user.id
+    )
+
+    crud.log_audit_action(
+        db, current_user.id, "CREATE", "availability_exception", db_exception.id,
+        f"Admin created exception for instructor {instructor.username} on {exception.exception_date}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return db_exception
 

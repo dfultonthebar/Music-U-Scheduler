@@ -1,7 +1,7 @@
 
 
 from pydantic import BaseModel, EmailStr, validator
-from datetime import datetime
+from datetime import datetime, date, time
 from typing import Optional, List, Dict, Any
 from enum import Enum
 
@@ -31,7 +31,9 @@ class UserBase(BaseModel):
     emergency_contact: Optional[str] = None
     notes: Optional[str] = None
     hourly_rate: Optional[float] = None
-    specializations: Optional[str] = None
+    specializations: Optional[str] = None  # For instructors: JSON of instruments they teach
+    instrument: Optional[str] = None  # For students: primary instrument they're learning
+    default_break_minutes: int = 5  # Default break between lessons (0, 5, 10, 15)
 
 
 class UserCreate(UserBase):
@@ -56,6 +58,8 @@ class UserUpdate(BaseModel):
     notes: Optional[str] = None
     hourly_rate: Optional[float] = None
     specializations: Optional[str] = None
+    instrument: Optional[str] = None
+    default_break_minutes: Optional[int] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None
     
@@ -106,12 +110,36 @@ class TokenData(BaseModel):
 class PasswordChange(BaseModel):
     old_password: str
     new_password: str
-    
+
     @validator('new_password')
     def validate_new_password(cls, v):
         if len(v) < 8:
             raise ValueError('New password must be at least 8 characters long')
         return v
+
+
+class PasswordResetRequest(BaseModel):
+    """Request to initiate password reset"""
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    """Confirm password reset with token"""
+    token: str
+    new_password: str
+
+    @validator('new_password')
+    def validate_new_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('New password must be at least 8 characters long')
+        return v
+
+
+class PasswordResetTokenResponse(BaseModel):
+    """Response containing the reset token (for development/testing)"""
+    message: str
+    token: Optional[str] = None  # Only included in dev mode or when email is disabled
+    expires_in_minutes: int = 60
 
 
 # Lesson Schemas
@@ -122,6 +150,7 @@ class LessonBase(BaseModel):
     student_id: int
     scheduled_at: datetime
     duration_minutes: int = 60
+    break_after_minutes: int = 0  # Break time reserved after this lesson
     instrument: Optional[str] = None
     lesson_type: str = "individual"
     cost: Optional[float] = None
@@ -139,6 +168,7 @@ class LessonUpdate(BaseModel):
     description: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     duration_minutes: Optional[int] = None
+    break_after_minutes: Optional[int] = None
     instrument: Optional[str] = None
     lesson_type: Optional[str] = None
     status: Optional[LessonStatus] = None
@@ -176,6 +206,7 @@ class LessonSummary(BaseModel):
     title: str
     scheduled_at: datetime
     duration_minutes: int
+    break_after_minutes: int = 0
     status: LessonStatus
     teacher_name: str
     student_name: str
@@ -278,4 +309,163 @@ class LessonReport(BaseModel):
     revenue: float
     popular_instruments: Dict[str, int]
     instructor_stats: Dict[str, Dict[str, Any]]
+
+
+# Instructor Availability Schemas
+class InstructorAvailabilityBase(BaseModel):
+    day_of_week: int  # 0=Monday, 6=Sunday
+    start_time: time
+    end_time: time
+    is_active: bool = True
+
+
+class InstructorAvailabilityCreate(InstructorAvailabilityBase):
+    pass
+
+
+class InstructorAvailabilityUpdate(BaseModel):
+    day_of_week: Optional[int] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    is_active: Optional[bool] = None
+
+
+class InstructorAvailability(InstructorAvailabilityBase):
+    id: int
+    instructor_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Availability Exception Schemas (Days Off)
+class AvailabilityExceptionBase(BaseModel):
+    exception_date: date
+    is_full_day: bool = True
+    start_time: Optional[time] = None  # If not full day
+    end_time: Optional[time] = None  # If not full day
+    reason: Optional[str] = None
+
+
+class AvailabilityExceptionCreate(AvailabilityExceptionBase):
+    pass
+
+
+class AvailabilityExceptionUpdate(BaseModel):
+    exception_date: Optional[date] = None
+    is_full_day: Optional[bool] = None
+    start_time: Optional[time] = None
+    end_time: Optional[time] = None
+    reason: Optional[str] = None
+
+
+class AvailabilityException(AvailabilityExceptionBase):
+    id: int
+    instructor_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Scheduling Schemas
+class TimeSlot(BaseModel):
+    """A specific time slot that can be scheduled"""
+    start_time: datetime
+    end_time: datetime
+    is_available: bool = True
+    conflict_reason: Optional[str] = None
+
+
+class InstructorScheduleDay(BaseModel):
+    """Schedule for a specific day including availability and booked lessons"""
+    date: date
+    day_of_week: int
+    availability_slots: List[InstructorAvailability] = []
+    exceptions: List[AvailabilityException] = []
+    lessons: List[LessonSummary] = []
+    is_day_off: bool = False
+
+
+class ScheduleConflict(BaseModel):
+    """Details about a scheduling conflict"""
+    conflict_type: str  # "lesson_overlap", "break_overlap", "outside_availability", "day_off"
+    message: str
+    conflicting_lesson_id: Optional[int] = None
+
+
+class ScheduleValidationResult(BaseModel):
+    """Result of validating a proposed lesson time"""
+    is_valid: bool
+    conflicts: List[ScheduleConflict] = []
+    suggested_times: List[TimeSlot] = []  # Alternative available slots if invalid
+
+
+# Email Settings Schemas
+class EmailSettingsBase(BaseModel):
+    smtp_host: str
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    imap_host: Optional[str] = None
+    imap_port: Optional[int] = None
+    imap_username: Optional[str] = None
+    imap_password: Optional[str] = None
+    from_email: str
+    from_name: str = "Music U Scheduler"
+
+
+class EmailSettingsUpdate(BaseModel):
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_use_tls: Optional[bool] = None
+    smtp_use_ssl: Optional[bool] = None
+    imap_host: Optional[str] = None
+    imap_port: Optional[int] = None
+    imap_username: Optional[str] = None
+    imap_password: Optional[str] = None
+    from_email: Optional[str] = None
+    from_name: Optional[str] = None
+
+
+class EmailSettingsResponse(BaseModel):
+    smtp_host: str
+    smtp_port: int
+    smtp_username: str
+    smtp_password: str  # Will be masked
+    smtp_use_tls: bool
+    smtp_use_ssl: bool
+    imap_host: Optional[str] = None
+    imap_port: Optional[int] = None
+    imap_username: Optional[str] = None
+    imap_password: Optional[str] = None  # Will be masked
+    from_email: str
+    from_name: str
+    is_configured: bool = False
+
+
+class SendEmailRequest(BaseModel):
+    to_email: EmailStr
+    subject: str
+    body_text: str
+    body_html: Optional[str] = None
+
+
+class SendBulkEmailRequest(BaseModel):
+    recipients: List[EmailStr]
+    subject: str
+    body_text: str
+    body_html: Optional[str] = None
+
+
+class EmailTestResult(BaseModel):
+    success: bool
+    message: str
 

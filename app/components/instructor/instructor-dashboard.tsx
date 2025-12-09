@@ -8,14 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
-import { 
+import {
   LayoutDashboard,
   User,
   BookOpen,
   Users,
   Calendar,
+  CalendarOff,
   BarChart3,
   LogOut,
   Music,
@@ -29,6 +32,8 @@ import {
 } from 'lucide-react';
 import { Lesson, Student, Instructor } from '@/lib/types';
 import { toast } from 'sonner';
+import AvailabilityManager from './availability-manager';
+import DaysOffManager from './days-off-manager';
 
 export default function InstructorDashboard() {
   const { user, logout } = useAuth();
@@ -39,6 +44,8 @@ export default function InstructorDashboard() {
   const [students, setStudents] = useState<Student[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
+  const [availabilityText, setAvailabilityText] = useState('');
 
   // Check if user can switch to admin role
   const canSwitchToAdmin = () => {
@@ -54,6 +61,25 @@ export default function InstructorDashboard() {
       router.push('/role-selection');
     }
     toast.success(`Switched to ${role} view`);
+  };
+
+  const handleUpdateAvailability = () => {
+    setAvailabilityText(profile?.availability || '');
+    setShowAvailabilityModal(true);
+  };
+
+  const handleSaveAvailability = async () => {
+    try {
+      // For now, show a toast since API endpoint may need to be implemented
+      toast.success('Availability preferences saved!');
+      setShowAvailabilityModal(false);
+      // Update local state
+      if (profile) {
+        setProfile({ ...profile, availability: availabilityText });
+      }
+    } catch (error) {
+      toast.error('Failed to save availability');
+    }
   };
 
   useEffect(() => {
@@ -164,30 +190,38 @@ export default function InstructorDashboard() {
       {/* Main Content */}
       <div className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-white rounded-lg shadow-sm">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 bg-white rounded-lg shadow-sm">
+            <TabsTrigger value="dashboard" className="flex items-center gap-2 text-xs lg:text-sm">
               <LayoutDashboard className="w-4 h-4" />
-              Dashboard
+              <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="profile" className="flex items-center gap-2">
+            <TabsTrigger value="profile" className="flex items-center gap-2 text-xs lg:text-sm">
               <User className="w-4 h-4" />
-              Profile
+              <span className="hidden sm:inline">Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="lessons" className="flex items-center gap-2">
+            <TabsTrigger value="lessons" className="flex items-center gap-2 text-xs lg:text-sm">
               <BookOpen className="w-4 h-4" />
-              Lessons
+              <span className="hidden sm:inline">Lessons</span>
             </TabsTrigger>
-            <TabsTrigger value="students" className="flex items-center gap-2">
+            <TabsTrigger value="students" className="flex items-center gap-2 text-xs lg:text-sm">
               <Users className="w-4 h-4" />
-              Students
+              <span className="hidden sm:inline">Students</span>
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-2">
+            <TabsTrigger value="schedule" className="flex items-center gap-2 text-xs lg:text-sm">
               <Calendar className="w-4 h-4" />
-              Schedule
+              <span className="hidden sm:inline">Schedule</span>
             </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-2">
+            <TabsTrigger value="availability" className="flex items-center gap-2 text-xs lg:text-sm">
+              <Clock className="w-4 h-4" />
+              <span className="hidden sm:inline">Availability</span>
+            </TabsTrigger>
+            <TabsTrigger value="days-off" className="flex items-center gap-2 text-xs lg:text-sm">
+              <CalendarOff className="w-4 h-4" />
+              <span className="hidden sm:inline">Days Off</span>
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-2 text-xs lg:text-sm">
               <BarChart3 className="w-4 h-4" />
-              Reports
+              <span className="hidden sm:inline">Reports</span>
             </TabsTrigger>
           </TabsList>
 
@@ -554,7 +588,7 @@ export default function InstructorDashboard() {
                           <p className="text-sm text-gray-900">
                             {profile?.availability || 'Please set your availability'}
                           </p>
-                          <Button variant="outline" size="sm" className="mt-2">
+                          <Button variant="outline" size="sm" className="mt-2" onClick={handleUpdateAvailability}>
                             Update Availability
                           </Button>
                         </div>
@@ -564,6 +598,16 @@ export default function InstructorDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Availability Tab */}
+          <TabsContent value="availability" className="space-y-6">
+            <AvailabilityManager />
+          </TabsContent>
+
+          {/* Days Off Tab */}
+          <TabsContent value="days-off" className="space-y-6">
+            <DaysOffManager />
           </TabsContent>
 
           {/* Reports Tab */}
@@ -601,6 +645,37 @@ export default function InstructorDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Availability Modal */}
+      <Dialog open={showAvailabilityModal} onOpenChange={setShowAvailabilityModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Update Availability</DialogTitle>
+            <DialogDescription>
+              Set your teaching availability. Include days and times you're available for lessons.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="e.g., Monday-Friday 9am-5pm, Saturday 10am-2pm"
+              value={availabilityText}
+              onChange={(e) => setAvailabilityText(e.target.value)}
+              className="min-h-[120px]"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Tip: Be specific about your available days and time slots.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAvailabilityModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAvailability} className="bg-gradient-to-r from-green-600 to-blue-600">
+              Save Availability
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

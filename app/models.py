@@ -1,6 +1,6 @@
 
 
-from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Text, Enum, Float
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Text, Enum, Float, Date, Time
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -20,6 +20,16 @@ class LessonStatus(str, enum.Enum):
     RESCHEDULED = "rescheduled"
 
 
+class DayOfWeek(int, enum.Enum):
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -36,7 +46,9 @@ class User(Base):
     emergency_contact = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
     hourly_rate = Column(Float, nullable=True)  # For instructors
-    specializations = Column(Text, nullable=True)  # JSON string of instruments/skills
+    specializations = Column(Text, nullable=True)  # JSON string of instruments/skills for instructors
+    instrument = Column(String, nullable=True)  # Primary instrument for students
+    default_break_minutes = Column(Integer, default=5)  # Default break between lessons (0, 5, 10, 15)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
@@ -58,6 +70,7 @@ class Lesson(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Admin who created
     scheduled_at = Column(DateTime(timezone=True), nullable=False)
     duration_minutes = Column(Integer, default=60)
+    break_after_minutes = Column(Integer, default=0)  # Break time reserved after this lesson
     instrument = Column(String, nullable=True)
     lesson_type = Column(String, default="individual")  # individual, group
     status = Column(Enum(LessonStatus), default=LessonStatus.SCHEDULED)
@@ -105,4 +118,54 @@ class AuditLog(Base):
 
     # Relationships
     user = relationship("User")
+
+
+class InstructorAvailability(Base):
+    """Weekly recurring availability time blocks for instructors"""
+    __tablename__ = "instructor_availability"
+
+    id = Column(Integer, primary_key=True, index=True)
+    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)  # 0=Monday, 6=Sunday
+    start_time = Column(Time, nullable=False)  # e.g., 09:00
+    end_time = Column(Time, nullable=False)  # e.g., 17:00
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    instructor = relationship("User", backref="availability_slots")
+
+
+class AvailabilityException(Base):
+    """Exceptions to regular availability (days off, custom unavailable times)"""
+    __tablename__ = "availability_exceptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    exception_date = Column(Date, nullable=False)  # The date of the exception
+    is_full_day = Column(Boolean, default=True)  # True = entire day off
+    start_time = Column(Time, nullable=True)  # If not full day, unavailable from
+    end_time = Column(Time, nullable=True)  # If not full day, unavailable until
+    reason = Column(String, nullable=True)  # Optional note (e.g., "Vacation", "Doctor's appointment")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    instructor = relationship("User", backref="availability_exceptions")
+
+
+class PasswordResetToken(Base):
+    """Password reset tokens for forgot password functionality"""
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String, unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", backref="password_reset_tokens")
 

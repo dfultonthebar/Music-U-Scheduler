@@ -7,7 +7,9 @@ Instructor API endpoints for Music U Scheduler
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
+from sqlalchemy import and_
+from sqlalchemy.orm import joinedload
 
 from ...database import get_db
 from ...auth.dependencies import require_instructor_role, require_teacher_role
@@ -393,5 +395,341 @@ async def get_instructor_summary_report(
         "total_teaching_hours": round(total_hours, 2),
         "instruments_taught": instruments,
         "completion_rate": round((completed_lessons / total_lessons * 100) if total_lessons > 0 else 0, 2)
+    }
+
+
+# Availability Management
+@router.get("/availability", response_model=List[schemas.InstructorAvailability])
+async def get_my_availability(
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Get instructor's weekly availability slots"""
+    return crud.get_instructor_availability_slots(db, current_user.id, is_active=True)
+
+
+@router.get("/availability/all", response_model=List[schemas.InstructorAvailability])
+async def get_all_my_availability(
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Get all instructor's availability slots (including inactive)"""
+    return crud.get_instructor_availability_slots(db, current_user.id)
+
+
+@router.post("/availability", response_model=schemas.InstructorAvailability)
+async def create_availability_slot(
+    availability: schemas.InstructorAvailabilityCreate,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Create a new availability time slot"""
+    # Validate day_of_week
+    if availability.day_of_week < 0 or availability.day_of_week > 6:
+        raise HTTPException(status_code=400, detail="day_of_week must be between 0 (Monday) and 6 (Sunday)")
+
+    # Validate times
+    if availability.start_time >= availability.end_time:
+        raise HTTPException(status_code=400, detail="start_time must be before end_time")
+
+    db_availability = crud.create_instructor_availability(
+        db, current_user.id, availability, created_by=current_user.id
+    )
+
+    crud.log_audit_action(
+        db, current_user.id, "CREATE", "instructor_availability", db_availability.id,
+        f"Created availability slot for {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][availability.day_of_week]}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return db_availability
+
+
+@router.post("/availability/bulk", response_model=List[schemas.InstructorAvailability])
+async def create_bulk_availability(
+    availability_list: List[schemas.InstructorAvailabilityCreate],
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Create multiple availability slots at once (e.g., for setting up weekly schedule)"""
+    for avail in availability_list:
+        if avail.day_of_week < 0 or avail.day_of_week > 6:
+            raise HTTPException(status_code=400, detail="day_of_week must be between 0 and 6")
+        if avail.start_time >= avail.end_time:
+            raise HTTPException(status_code=400, detail="start_time must be before end_time")
+
+    created_slots = crud.bulk_create_instructor_availability(
+        db, current_user.id, availability_list, created_by=current_user.id
+    )
+
+    crud.log_audit_action(
+        db, current_user.id, "BULK_CREATE", "instructor_availability", None,
+        f"Created {len(created_slots)} availability slots",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return created_slots
+
+
+@router.put("/availability/{availability_id}", response_model=schemas.InstructorAvailability)
+async def update_availability_slot(
+    availability_id: int,
+    availability_update: schemas.InstructorAvailabilityUpdate,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Update an availability slot"""
+    # Verify ownership
+    existing = crud.get_instructor_availability(db, availability_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Availability slot not found")
+    if existing.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this availability slot")
+
+    # Validate updates if provided
+    if availability_update.day_of_week is not None:
+        if availability_update.day_of_week < 0 or availability_update.day_of_week > 6:
+            raise HTTPException(status_code=400, detail="day_of_week must be between 0 and 6")
+
+    updated = crud.update_instructor_availability(
+        db, availability_id, availability_update, updated_by=current_user.id
+    )
+
+    crud.log_audit_action(
+        db, current_user.id, "UPDATE", "instructor_availability", availability_id,
+        f"Updated availability slot",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return updated
+
+
+@router.delete("/availability/{availability_id}")
+async def delete_availability_slot(
+    availability_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Delete an availability slot"""
+    existing = crud.get_instructor_availability(db, availability_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Availability slot not found")
+    if existing.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this availability slot")
+
+    crud.delete_instructor_availability(db, availability_id, deleted_by=current_user.id)
+
+    crud.log_audit_action(
+        db, current_user.id, "DELETE", "instructor_availability", availability_id,
+        f"Deleted availability slot",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return {"message": "Availability slot deleted successfully"}
+
+
+@router.delete("/availability/clear-all")
+async def clear_all_availability(
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Clear all availability slots for the instructor"""
+    slots = crud.get_instructor_availability_slots(db, current_user.id)
+    deleted_count = 0
+    for slot in slots:
+        crud.delete_instructor_availability(db, slot.id)
+        deleted_count += 1
+
+    crud.log_audit_action(
+        db, current_user.id, "BULK_DELETE", "instructor_availability", None,
+        f"Cleared all {deleted_count} availability slots",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return {"message": f"Cleared {deleted_count} availability slots"}
+
+
+# Days Off / Exceptions Management
+@router.get("/exceptions", response_model=List[schemas.AvailabilityException])
+async def get_my_exceptions(
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Get instructor's days off and exceptions"""
+    return crud.get_instructor_exceptions(db, current_user.id, date_from=date_from, date_to=date_to)
+
+
+@router.post("/exceptions", response_model=schemas.AvailabilityException)
+async def create_exception(
+    exception: schemas.AvailabilityExceptionCreate,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Create a new day off or exception"""
+    # Check if exception already exists for this date
+    existing = crud.get_exception_for_date(db, current_user.id, exception.exception_date)
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"An exception already exists for {exception.exception_date}. Please update or delete it first."
+        )
+
+    # Validate partial day times
+    if not exception.is_full_day:
+        if not exception.start_time or not exception.end_time:
+            raise HTTPException(
+                status_code=400,
+                detail="start_time and end_time are required for partial day exceptions"
+            )
+        if exception.start_time >= exception.end_time:
+            raise HTTPException(status_code=400, detail="start_time must be before end_time")
+
+    db_exception = crud.create_availability_exception(
+        db, current_user.id, exception, created_by=current_user.id
+    )
+
+    crud.log_audit_action(
+        db, current_user.id, "CREATE", "availability_exception", db_exception.id,
+        f"Created exception for {exception.exception_date}: {exception.reason or 'Day off'}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return db_exception
+
+
+@router.put("/exceptions/{exception_id}", response_model=schemas.AvailabilityException)
+async def update_exception(
+    exception_id: int,
+    exception_update: schemas.AvailabilityExceptionUpdate,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Update an exception"""
+    existing = crud.get_availability_exception(db, exception_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Exception not found")
+    if existing.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this exception")
+
+    updated = crud.update_availability_exception(
+        db, exception_id, exception_update, updated_by=current_user.id
+    )
+
+    crud.log_audit_action(
+        db, current_user.id, "UPDATE", "availability_exception", exception_id,
+        f"Updated exception",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return updated
+
+
+@router.delete("/exceptions/{exception_id}")
+async def delete_exception(
+    exception_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Delete an exception"""
+    existing = crud.get_availability_exception(db, exception_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Exception not found")
+    if existing.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this exception")
+
+    crud.delete_availability_exception(db, exception_id, deleted_by=current_user.id)
+
+    crud.log_audit_action(
+        db, current_user.id, "DELETE", "availability_exception", exception_id,
+        f"Deleted exception for {existing.exception_date}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return {"message": "Exception deleted successfully"}
+
+
+# Break Settings
+@router.get("/break-settings")
+async def get_break_settings(
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Get instructor's default break time between lessons"""
+    return {
+        "default_break_minutes": current_user.default_break_minutes or 5,
+        "available_options": [0, 5, 10, 15]
+    }
+
+
+@router.put("/break-settings")
+async def update_break_settings(
+    break_minutes: int = Query(..., ge=0, le=15, description="Break time in minutes (0, 5, 10, or 15)"),
+    request: Request = None,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Update instructor's default break time between lessons"""
+    if break_minutes not in [0, 5, 10, 15]:
+        raise HTTPException(status_code=400, detail="Break time must be 0, 5, 10, or 15 minutes")
+
+    user_update = schemas.UserUpdate(default_break_minutes=break_minutes)
+    crud.update_user(db, current_user.id, user_update)
+
+    crud.log_audit_action(
+        db, current_user.id, "UPDATE", "user", current_user.id,
+        f"Updated default break time to {break_minutes} minutes",
+        ip_address=request.client.host if request else None,
+        user_agent=request.headers.get("user-agent") if request else None
+    )
+
+    return {
+        "message": "Break settings updated successfully",
+        "default_break_minutes": break_minutes
+    }
+
+
+# Full Schedule View
+@router.get("/full-schedule")
+async def get_full_schedule(
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Get instructor's full schedule including availability, exceptions, and lessons"""
+    if not date_from:
+        date_from = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    if not date_to:
+        date_to = date_from + timedelta(days=30)
+
+    schedule = crud.get_instructor_schedule_for_date_range(db, current_user.id, date_from, date_to)
+
+    return {
+        "instructor_id": current_user.id,
+        "instructor_name": current_user.full_name,
+        "default_break_minutes": current_user.default_break_minutes or 5,
+        "date_range": {
+            "from": date_from.isoformat(),
+            "to": date_to.isoformat()
+        },
+        "schedule": schedule
     }
 

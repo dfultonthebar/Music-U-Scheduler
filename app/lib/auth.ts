@@ -25,7 +25,8 @@ export const authOptions: NextAuthOptions = {
           formData.append('username', credentials.username);
           formData.append('password', credentials.password);
 
-          const response = await fetch('http://localhost:8080/auth/login', {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          const response = await fetch(`${apiUrl}/auth/login`, {
             method: 'POST',
             body: formData,
           });
@@ -33,9 +34,9 @@ export const authOptions: NextAuthOptions = {
           if (response.ok) {
             const authData = await response.json();
             console.log('Backend authentication successful for:', credentials.username);
-            
+
             // Get user details from backend
-            const userResponse = await fetch('http://localhost:8080/auth/me', {
+            const userResponse = await fetch(`${apiUrl}/auth/me`, {
               headers: {
                 'Authorization': `Bearer ${authData.access_token}`,
               },

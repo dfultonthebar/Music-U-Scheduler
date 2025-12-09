@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/layout/protected-route';
 import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { Music, LogOut, User, BookOpen } from 'lucide-react';
 
 function GeneralDashboard() {
   const { user, logout, displayName } = useAuth();
+  const router = useRouter();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,17 +60,23 @@ function GeneralDashboard() {
             </CardHeader>
             <CardContent className="text-center space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md mx-auto">
-                <div className="p-4 border border-gray-200 rounded-lg">
+                <button
+                  onClick={() => router.push('/instructor')}
+                  className="p-4 border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all cursor-pointer text-left"
+                >
                   <User className="w-8 h-8 mx-auto mb-2 text-blue-600" />
                   <h3 className="font-medium text-gray-900">Profile</h3>
                   <p className="text-sm text-gray-500">Manage your account</p>
-                </div>
-                
-                <div className="p-4 border border-gray-200 rounded-lg">
+                </button>
+
+                <button
+                  onClick={() => router.push('/instructor')}
+                  className="p-4 border border-gray-200 rounded-lg hover:border-green-400 hover:shadow-md transition-all cursor-pointer text-left"
+                >
                   <BookOpen className="w-8 h-8 mx-auto mb-2 text-green-600" />
                   <h3 className="font-medium text-gray-900">Lessons</h3>
                   <p className="text-sm text-gray-500">View your lessons</p>
-                </div>
+                </button>
               </div>
 
               <div className="pt-6 border-t border-gray-200">

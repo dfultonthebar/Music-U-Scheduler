@@ -152,6 +152,25 @@ class APIService {
     this.clearToken();
   }
 
+  // Password Reset endpoints
+  async forgotPassword(email: string): Promise<{ message: string; token?: string; expires_in_minutes: number }> {
+    return this.makeRequest('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    return this.makeRequest('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword }),
+    });
+  }
+
+  async verifyResetToken(token: string): Promise<{ valid: boolean; email_hint?: string; message: string }> {
+    return this.makeRequest(`/auth/verify-reset-token/${token}`);
+  }
+
   // Admin endpoints
   async getAdminDashboard(): Promise<DashboardStats> {
     return this.makeRequest<DashboardStats>('/admin/dashboard');
@@ -218,7 +237,7 @@ class APIService {
 
   // Enhanced Admin User Management
   async createUser(userData: CreateUserData): Promise<User> {
-    const payload = {
+    const payload: Record<string, any> = {
       username: userData.username,
       email: userData.email,
       password: userData.password,
@@ -227,7 +246,17 @@ class APIService {
       role: userData.role,
       is_teacher: userData.role === 'instructor',
     };
-    
+
+    // Add instrument for students
+    if (userData.role === 'student' && userData.instrument) {
+      payload.instrument = userData.instrument;
+    }
+
+    // Add specializations for instructors
+    if (userData.role === 'instructor' && userData.specializations) {
+      payload.specializations = userData.specializations;
+    }
+
     return await this.makeRequest<User>('/admin/users', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -495,52 +524,51 @@ class APIService {
   }
 
   // Email Server Settings
-  async getEmailSettings(): Promise<EmailServerSettings> {
-    try {
-      return await this.makeRequest<EmailServerSettings>('/admin/email-settings');
-    } catch (error) {
-      // Mock settings for testing
-      return {
-        smtp_host: 'smtp.gmail.com',
-        smtp_port: 587,
-        smtp_username: '',
-        smtp_password: '',
-        smtp_use_tls: true,
-        smtp_use_ssl: false,
-        imap_host: 'imap.gmail.com',
-        imap_port: 993,
-        imap_username: '',
-        imap_password: '',
-        from_email: 'admin@musicu.local',
-        from_name: 'Music-U-Scheduler'
-      };
-    }
+  async getEmailSettings(): Promise<EmailServerSettings & { is_configured?: boolean }> {
+    return await this.makeRequest<EmailServerSettings & { is_configured?: boolean }>('/admin/email-settings');
   }
 
-  async updateEmailSettings(settings: EmailServerSettings): Promise<EmailServerSettings> {
-    try {
-      return await this.makeRequest<EmailServerSettings>('/admin/email-settings', {
-        method: 'PUT',
-        body: JSON.stringify(settings),
-      });
-    } catch (error) {
-      console.log('Email settings updated (mock):', settings);
-      return settings;
-    }
+  async updateEmailSettings(settings: Partial<EmailServerSettings>): Promise<EmailServerSettings & { is_configured?: boolean }> {
+    return await this.makeRequest<EmailServerSettings & { is_configured?: boolean }>('/admin/email-settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
   }
 
-  async testEmailSettings(settings: EmailServerSettings): Promise<{ success: boolean; message: string }> {
-    try {
-      return await this.makeRequest<{ success: boolean; message: string }>('/admin/email-settings/test', {
-        method: 'POST',
-        body: JSON.stringify(settings),
-      });
-    } catch (error) {
-      return {
-        success: true,
-        message: 'Email settings test successful (mock)'
-      };
-    }
+  async testEmailConnection(): Promise<{ success: boolean; message: string }> {
+    return await this.makeRequest<{ success: boolean; message: string }>('/admin/email-settings/test', {
+      method: 'POST',
+    });
+  }
+
+  async sendTestEmail(toEmail: string): Promise<{ success: boolean; message: string }> {
+    return await this.makeRequest<{ success: boolean; message: string }>(`/admin/email-settings/send-test?to_email=${encodeURIComponent(toEmail)}`, {
+      method: 'POST',
+    });
+  }
+
+  async sendEmail(toEmail: string, subject: string, bodyText: string, bodyHtml?: string): Promise<{ success: boolean; message: string }> {
+    return await this.makeRequest<{ success: boolean; message: string }>('/admin/email/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        to_email: toEmail,
+        subject,
+        body_text: bodyText,
+        body_html: bodyHtml,
+      }),
+    });
+  }
+
+  async sendBulkEmail(recipients: string[], subject: string, bodyText: string, bodyHtml?: string): Promise<any> {
+    return await this.makeRequest<any>('/admin/email/send-bulk', {
+      method: 'POST',
+      body: JSON.stringify({
+        recipients,
+        subject,
+        body_text: bodyText,
+        body_html: bodyHtml,
+      }),
+    });
   }
 
   // System Backup
@@ -674,6 +702,200 @@ class APIService {
         description: 'Complete Authentication Integration - Production Release'
       };
     }
+  }
+
+  // Scheduling and Availability APIs
+
+  // Get instructor's availability (admin view)
+  async getInstructorAvailability(instructorId: number): Promise<any> {
+    return await this.makeRequest<any>(`/admin/scheduling/instructors/${instructorId}/availability`);
+  }
+
+  // Get instructor's exceptions/days off (admin view)
+  async getInstructorExceptions(instructorId: number, dateFrom?: string, dateTo?: string): Promise<any> {
+    let endpoint = `/admin/scheduling/instructors/${instructorId}/exceptions`;
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    if (params.toString()) endpoint += `?${params.toString()}`;
+    return await this.makeRequest<any>(endpoint);
+  }
+
+  // Get instructor's full schedule
+  async getInstructorFullSchedule(instructorId: number, dateFrom?: string, dateTo?: string): Promise<any> {
+    let endpoint = `/admin/scheduling/instructors/${instructorId}/schedule`;
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    if (params.toString()) endpoint += `?${params.toString()}`;
+    return await this.makeRequest<any>(endpoint);
+  }
+
+  // Get all instructors for scheduling (with availability info)
+  async getInstructorsForScheduling(): Promise<any> {
+    return await this.makeRequest<any>('/admin/instructors');
+  }
+
+  // Get students assigned to a specific instructor
+  async getStudentsByInstructor(instructorId: number): Promise<any> {
+    return await this.makeRequest<any>(`/admin/instructors/${instructorId}/students`);
+  }
+
+  // Get all students for scheduling
+  async getAllStudentsForScheduling(): Promise<any> {
+    return await this.makeRequest<any>('/admin/students');
+  }
+
+  // Validate proposed lesson time
+  async validateLessonTime(
+    instructorId: number,
+    scheduledAt: string,
+    durationMinutes: number = 60,
+    breakAfterMinutes: number = 0
+  ): Promise<any> {
+    const params = new URLSearchParams({
+      instructor_id: instructorId.toString(),
+      scheduled_at: scheduledAt,
+      duration_minutes: durationMinutes.toString(),
+      break_after_minutes: breakAfterMinutes.toString()
+    });
+    return await this.makeRequest<any>(`/admin/scheduling/validate?${params.toString()}`, {
+      method: 'POST'
+    });
+  }
+
+  // Get available time slots
+  async getAvailableSlots(
+    instructorId: number,
+    targetDate: string,
+    durationMinutes: number = 60,
+    breakMinutes: number = 0
+  ): Promise<any> {
+    const params = new URLSearchParams({
+      instructor_id: instructorId.toString(),
+      target_date: targetDate,
+      duration_minutes: durationMinutes.toString(),
+      break_minutes: breakMinutes.toString()
+    });
+    return await this.makeRequest<any>(`/admin/scheduling/available-slots?${params.toString()}`);
+  }
+
+  // Get duration options
+  async getDurationOptions(): Promise<any> {
+    return await this.makeRequest<any>('/admin/scheduling/duration-options');
+  }
+
+  // Create lesson with validation
+  async createLessonWithValidation(lessonData: any, validate: boolean = true): Promise<any> {
+    return await this.makeRequest<any>(`/admin/scheduling/lessons?validate=${validate}`, {
+      method: 'POST',
+      body: JSON.stringify(lessonData)
+    });
+  }
+
+  // Create availability for instructor (admin)
+  async createInstructorAvailabilityAdmin(instructorId: number, availabilityData: any): Promise<any> {
+    return await this.makeRequest<any>(`/admin/scheduling/instructors/${instructorId}/availability`, {
+      method: 'POST',
+      body: JSON.stringify(availabilityData)
+    });
+  }
+
+  // Create exception for instructor (admin)
+  async createInstructorExceptionAdmin(instructorId: number, exceptionData: any): Promise<any> {
+    return await this.makeRequest<any>(`/admin/scheduling/instructors/${instructorId}/exceptions`, {
+      method: 'POST',
+      body: JSON.stringify(exceptionData)
+    });
+  }
+
+  // Instructor self-service availability APIs
+  async getMyAvailability(): Promise<any> {
+    return await this.makeRequest<any>('/instructor/availability');
+  }
+
+  async createMyAvailability(availabilityData: any): Promise<any> {
+    return await this.makeRequest<any>('/instructor/availability', {
+      method: 'POST',
+      body: JSON.stringify(availabilityData)
+    });
+  }
+
+  async createBulkAvailability(availabilityList: any[]): Promise<any> {
+    return await this.makeRequest<any>('/instructor/availability/bulk', {
+      method: 'POST',
+      body: JSON.stringify(availabilityList)
+    });
+  }
+
+  async updateMyAvailability(availabilityId: number, updateData: any): Promise<any> {
+    return await this.makeRequest<any>(`/instructor/availability/${availabilityId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
+  }
+
+  async deleteMyAvailability(availabilityId: number): Promise<any> {
+    return await this.makeRequest<any>(`/instructor/availability/${availabilityId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async clearAllAvailability(): Promise<any> {
+    return await this.makeRequest<any>('/instructor/availability/clear-all', {
+      method: 'DELETE'
+    });
+  }
+
+  // Instructor exceptions (days off)
+  async getMyExceptions(dateFrom?: string, dateTo?: string): Promise<any> {
+    let endpoint = '/instructor/exceptions';
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    if (params.toString()) endpoint += `?${params.toString()}`;
+    return await this.makeRequest<any>(endpoint);
+  }
+
+  async createMyException(exceptionData: any): Promise<any> {
+    return await this.makeRequest<any>('/instructor/exceptions', {
+      method: 'POST',
+      body: JSON.stringify(exceptionData)
+    });
+  }
+
+  async updateMyException(exceptionId: number, updateData: any): Promise<any> {
+    return await this.makeRequest<any>(`/instructor/exceptions/${exceptionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
+  }
+
+  async deleteMyException(exceptionId: number): Promise<any> {
+    return await this.makeRequest<any>(`/instructor/exceptions/${exceptionId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // Break settings
+  async getBreakSettings(): Promise<any> {
+    return await this.makeRequest<any>('/instructor/break-settings');
+  }
+
+  async updateBreakSettings(breakMinutes: number): Promise<any> {
+    return await this.makeRequest<any>(`/instructor/break-settings?break_minutes=${breakMinutes}`, {
+      method: 'PUT'
+    });
+  }
+
+  // Full schedule
+  async getMyFullSchedule(dateFrom?: string, dateTo?: string): Promise<any> {
+    let endpoint = '/instructor/full-schedule';
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    if (params.toString()) endpoint += `?${params.toString()}`;
+    return await this.makeRequest<any>(endpoint);
   }
 }
 

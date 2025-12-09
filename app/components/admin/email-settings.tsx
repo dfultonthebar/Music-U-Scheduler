@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Save, TestTube, Mail, Server, Lock, Eye, EyeOff } from 'lucide-react';
+import { Save, TestTube, Mail, Server, Lock, Eye, EyeOff, Send, CheckCircle, XCircle } from 'lucide-react';
 import { apiService } from '@/lib/api';
 import { EmailServerSettings } from '@/lib/types';
 
@@ -32,7 +32,10 @@ export default function EmailSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
   const [showPasswords, setShowPasswords] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [isConfigured, setIsConfigured] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -42,8 +45,23 @@ export default function EmailSettings() {
     try {
       setLoading(true);
       const emailSettings = await apiService.getEmailSettings();
-      setSettings(emailSettings);
+      setSettings({
+        smtp_host: emailSettings.smtp_host || '',
+        smtp_port: emailSettings.smtp_port || 587,
+        smtp_username: emailSettings.smtp_username || '',
+        smtp_password: emailSettings.smtp_password || '',
+        smtp_use_tls: emailSettings.smtp_use_tls ?? true,
+        smtp_use_ssl: emailSettings.smtp_use_ssl ?? false,
+        imap_host: emailSettings.imap_host || '',
+        imap_port: emailSettings.imap_port || 993,
+        imap_username: emailSettings.imap_username || '',
+        imap_password: emailSettings.imap_password || '',
+        from_email: emailSettings.from_email || '',
+        from_name: emailSettings.from_name || ''
+      });
+      setIsConfigured(emailSettings.is_configured || false);
     } catch (error) {
+      console.error('Failed to load email settings:', error);
       toast.error('Failed to load email settings');
     } finally {
       setLoading(false);
@@ -53,28 +71,52 @@ export default function EmailSettings() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await apiService.updateEmailSettings(settings);
+      const result = await apiService.updateEmailSettings(settings);
+      setIsConfigured(result.is_configured || false);
       toast.success('Email settings saved successfully');
     } catch (error) {
+      console.error('Failed to save:', error);
       toast.error('Failed to save email settings');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleTest = async () => {
+  const handleTestConnection = async () => {
     try {
       setTesting(true);
-      const result = await apiService.testEmailSettings(settings);
+      const result = await apiService.testEmailConnection();
       if (result.success) {
         toast.success(result.message);
       } else {
         toast.error(result.message);
       }
     } catch (error) {
-      toast.error('Failed to test email settings');
+      console.error('Test failed:', error);
+      toast.error('Failed to test email connection');
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmail) {
+      toast.error('Please enter an email address');
+      return;
+    }
+    try {
+      setSendingTest(true);
+      const result = await apiService.sendTestEmail(testEmail);
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Send test failed:', error);
+      toast.error('Failed to send test email');
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -97,11 +139,24 @@ export default function EmailSettings() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Email Server Settings</h2>
           <p className="text-gray-500">Configure SMTP and IMAP settings for email functionality</p>
+          <div className="mt-2 flex items-center gap-2">
+            {isConfigured ? (
+              <span className="inline-flex items-center gap-1 text-sm text-green-600">
+                <CheckCircle className="w-4 h-4" />
+                Email configured
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-sm text-amber-600">
+                <XCircle className="w-4 h-4" />
+                Email not configured
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleTest} disabled={testing}>
+          <Button variant="outline" onClick={handleTestConnection} disabled={testing || !isConfigured}>
             <TestTube className="w-4 h-4 mr-2" />
-            {testing ? 'Testing...' : 'Test Settings'}
+            {testing ? 'Testing...' : 'Test Connection'}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             <Save className="w-4 h-4 mr-2" />
@@ -301,6 +356,35 @@ export default function EmailSettings() {
         </CardContent>
       </Card>
 
+      {/* Send Test Email */}
+      {isConfigured && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5" />
+              Send Test Email
+            </CardTitle>
+            <CardDescription>Send a test email to verify your settings work correctly</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Input
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="Enter email address to send test to"
+                />
+              </div>
+              <Button onClick={handleSendTestEmail} disabled={sendingTest || !testEmail}>
+                <Send className="w-4 h-4 mr-2" />
+                {sendingTest ? 'Sending...' : 'Send Test'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Configuration Help */}
       <Card>
         <CardHeader>
@@ -319,7 +403,7 @@ export default function EmailSettings() {
                 <li>Note: Use App Password for 2FA enabled accounts</li>
               </ul>
             </div>
-            
+
             <div>
               <h4 className="font-medium mb-2">Office 365 Settings</h4>
               <ul className="text-sm text-muted-foreground space-y-1">

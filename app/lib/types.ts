@@ -124,6 +124,8 @@ export interface CreateUserData {
   role: 'instructor' | 'student';
   full_name?: string;
   is_instructor?: boolean;
+  instrument?: string;  // Primary instrument for students
+  specializations?: string;  // Instruments taught by instructors (comma-separated)
 }
 
 export interface EmailServerSettings {

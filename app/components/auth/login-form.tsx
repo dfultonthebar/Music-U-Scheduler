@@ -150,8 +150,8 @@ export default function LoginForm() {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
                 disabled={isLoading}
               >
@@ -164,9 +164,18 @@ export default function LoginForm() {
                   'Sign In'
                 )}
               </Button>
+
+              <div className="text-center mt-4">
+                <a
+                  href="/forgot-password"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                >
+                  Forgot your password?
+                </a>
+              </div>
             </form>
           </CardContent>
-          
+
           <CardFooter className="text-center">
             <p className="text-sm text-gray-500">
               Music-U-Scheduler • Lesson Management System

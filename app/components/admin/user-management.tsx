@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, Users, UserPlus, GraduationCap, Crown, X, Shield, UserCheck } from 'lucide-react';
+import { Plus, Trash2, Edit, Users, UserPlus, GraduationCap, Crown, X, Shield, UserCheck, Music } from 'lucide-react';
 import { apiService } from '@/lib/api';
 import { User, CreateUserData, InstructorRole, InstructorWithRoles, PromoteToAdminData } from '@/lib/types';
 
@@ -32,8 +32,16 @@ export default function UserManagement() {
     first_name: '',
     last_name: '',
     phone: '',
-    role: 'student'
+    role: 'student',
+    instrument: '',
+    specializations: ''
   });
+
+  // Available instruments list
+  const instruments = [
+    'Piano', 'Guitar', 'Violin', 'Voice', 'Drums', 'Bass', 'Saxophone',
+    'Clarinet', 'Flute', 'Trumpet', 'Trombone', 'Cello', 'Viola', 'Ukulele', 'Other'
+  ];
 
   useEffect(() => {
     loadData();
@@ -62,6 +70,12 @@ export default function UserManagement() {
         return;
       }
 
+      // Validate password length
+      if (createFormData.password.length < 8) {
+        toast.error('Password must be at least 8 characters long');
+        return;
+      }
+
       const newUser = await apiService.createUser(createFormData);
       setUsers([...users, newUser]);
       setShowCreateDialog(false);
@@ -72,11 +86,15 @@ export default function UserManagement() {
         first_name: '',
         last_name: '',
         phone: '',
-        role: 'student'
+        role: 'student',
+        instrument: '',
+        specializations: ''
       });
       toast.success(`${createFormData.role === 'instructor' ? 'Instructor' : 'Student'} created successfully`);
-    } catch (error) {
-      toast.error('Failed to create user');
+    } catch (error: any) {
+      console.error('Create user error:', error);
+      const errorMessage = error?.message || 'Failed to create user';
+      toast.error(errorMessage);
     }
   };
 
@@ -327,6 +345,92 @@ export default function UserManagement() {
                   placeholder="••••••••"
                 />
               </div>
+
+              {/* Instrument dropdown for students */}
+              {createFormData.role === 'student' && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="instrument" className="text-right flex items-center justify-end gap-1">
+                    <Music className="w-4 h-4" />
+                    Instrument
+                  </Label>
+                  <Select
+                    value={createFormData.instrument || ''}
+                    onValueChange={(value) => setCreateFormData({...createFormData, instrument: value})}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select instrument" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {instruments.map((instrument) => (
+                        <SelectItem key={instrument} value={instrument}>
+                          {instrument}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Specializations for instructors (multi-select) */}
+              {createFormData.role === 'instructor' && (
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label htmlFor="specializations" className="text-right flex items-center justify-end gap-1 pt-2">
+                    <Music className="w-4 h-4" />
+                    Instruments
+                  </Label>
+                  <div className="col-span-3 space-y-2">
+                    <div className="flex flex-wrap gap-2 p-2 border rounded-md min-h-[40px]">
+                      {(createFormData.specializations || '').split(',').filter(Boolean).map((instrument) => (
+                        <Badge
+                          key={instrument}
+                          variant="secondary"
+                          className="flex items-center gap-1"
+                        >
+                          {instrument.trim()}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = (createFormData.specializations || '').split(',').filter(Boolean);
+                              const updated = current.filter(i => i.trim() !== instrument.trim());
+                              setCreateFormData({...createFormData, specializations: updated.join(',')});
+                            }}
+                            className="ml-1 hover:text-red-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <Select
+                      onValueChange={(value) => {
+                        const current = (createFormData.specializations || '').split(',').filter(Boolean);
+                        if (!current.includes(value)) {
+                          setCreateFormData({
+                            ...createFormData,
+                            specializations: [...current, value].join(',')
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add instrument..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {instruments
+                          .filter(i => !(createFormData.specializations || '').split(',').includes(i))
+                          .map((instrument) => (
+                            <SelectItem key={instrument} value={instrument}>
+                              {instrument}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select all instruments this instructor can teach
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="submit" onClick={handleCreateUser}>

@@ -38,6 +38,7 @@ import EmailSettings from './email-settings';
 import SystemBackupManager from './system-backup';
 import GitHubUpdates from './github-updates';
 import VersionManagement from './version-management';
+import LessonScheduler from './lesson-scheduler';
 import { getVersionString, getCurrentVersion } from '@/lib/version';
 
 export default function AdminDashboard() {
@@ -204,6 +205,10 @@ export default function AdminDashboard() {
               <UserCheck className="w-4 h-4" />
               <span className="hidden sm:inline">Roles</span>
             </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center gap-2 text-xs lg:text-sm">
+              <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Schedule</span>
+            </TabsTrigger>
             <TabsTrigger value="lessons" className="flex items-center gap-2 text-xs lg:text-sm">
               <BookOpen className="w-4 h-4" />
               <span className="hidden sm:inline">Lessons</span>
@@ -359,6 +364,11 @@ export default function AdminDashboard() {
           {/* Version Management Tab */}
           <TabsContent value="version" className="space-y-6">
             <VersionManagement />
+          </TabsContent>
+
+          {/* Schedule Tab */}
+          <TabsContent value="schedule" className="space-y-6">
+            <LessonScheduler />
           </TabsContent>
 
           {/* Lessons Tab */}

@@ -6,15 +6,20 @@ Authentication routes for user registration and login
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from typing import Any
+import secrets
+import os
 
 from ..database import get_db
 from .. import crud, schemas, models
-from .utils import create_access_token, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
+from .utils import create_access_token, verify_password, get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
 from .dependencies import get_current_active_user
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+
+# Password reset token expiration in minutes
+PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = 60
 
 
 @router.post("/register", response_model=schemas.User)
@@ -133,15 +138,15 @@ async def change_password(
 ) -> Any:
     """
     Change user password
-    
+
     Args:
         password_data: Old and new password data
         current_user: Current authenticated user
         db: Database session
-        
+
     Returns:
         Success message
-        
+
     Raises:
         HTTPException: 400 if old password is incorrect
     """
@@ -151,9 +156,175 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect old password"
         )
-    
+
     # Update password
     user_update = schemas.UserUpdate(password=password_data.new_password)
     crud.update_user(db=db, user_id=current_user.id, user_update=user_update)
-    
+
     return {"message": "Password changed successfully"}
+
+
+@router.post("/forgot-password", response_model=schemas.PasswordResetTokenResponse)
+async def forgot_password(
+    request: schemas.PasswordResetRequest,
+    db: Session = Depends(get_db)
+) -> Any:
+    """
+    Request a password reset token
+
+    Args:
+        request: Email address to send reset token to
+        db: Database session
+
+    Returns:
+        Success message (and token in dev mode)
+
+    Note:
+        For security, this always returns success even if email doesn't exist.
+        In production, this would send an email. Currently returns token directly.
+    """
+    user = crud.get_user_by_email(db, email=request.email)
+
+    # Generate response - always return success for security
+    response = {
+        "message": "If an account exists with this email, a password reset link has been sent.",
+        "expires_in_minutes": PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
+    }
+
+    if user:
+        # Generate a secure random token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_TOKEN_EXPIRE_MINUTES)
+
+        # Invalidate any existing tokens for this user
+        db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.user_id == user.id,
+            models.PasswordResetToken.used == False
+        ).update({"used": True})
+
+        # Create new token
+        reset_token = models.PasswordResetToken(
+            user_id=user.id,
+            token=token,
+            expires_at=expires_at
+        )
+        db.add(reset_token)
+        db.commit()
+
+        # In production, send email here
+        # For now, include token in response (dev mode)
+        dev_mode = os.getenv("DEV_MODE", "true").lower() == "true"
+        if dev_mode:
+            response["token"] = token
+
+    return response
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: schemas.PasswordResetConfirm,
+    db: Session = Depends(get_db)
+) -> Any:
+    """
+    Reset password using a valid reset token
+
+    Args:
+        request: Token and new password
+        db: Database session
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: 400 if token is invalid or expired
+    """
+    # Find the token
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == request.token,
+        models.PasswordResetToken.used == False
+    ).first()
+
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+
+    # Check if token is expired (handle both naive and aware datetimes from SQLite)
+    expires_at = reset_token.expires_at
+    now = datetime.now(timezone.utc)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < now:
+        reset_token.used = True
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired"
+        )
+
+    # Get the user
+    user = db.query(models.User).filter(models.User.id == reset_token.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found"
+        )
+
+    # Update password
+    user.hashed_password = get_password_hash(request.new_password)
+
+    # Mark token as used
+    reset_token.used = True
+
+    db.commit()
+
+    return {"message": "Password has been reset successfully"}
+
+
+@router.get("/verify-reset-token/{token}")
+async def verify_reset_token(
+    token: str,
+    db: Session = Depends(get_db)
+) -> Any:
+    """
+    Verify if a password reset token is valid
+
+    Args:
+        token: The reset token to verify
+        db: Database session
+
+    Returns:
+        Valid status and email hint
+    """
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == token,
+        models.PasswordResetToken.used == False
+    ).first()
+
+    if not reset_token:
+        return {"valid": False, "message": "Invalid or expired token"}
+
+    # Handle both naive and aware datetimes from SQLite
+    expires_at = reset_token.expires_at
+    now = datetime.now(timezone.utc)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < now:
+        return {"valid": False, "message": "Token has expired"}
+
+    # Get user email (masked)
+    user = db.query(models.User).filter(models.User.id == reset_token.user_id).first()
+    email_hint = ""
+    if user and user.email:
+        parts = user.email.split("@")
+        if len(parts) == 2:
+            email_hint = f"{parts[0][:2]}***@{parts[1]}"
+
+    return {
+        "valid": True,
+        "email_hint": email_hint,
+        "message": "Token is valid"
+    }
