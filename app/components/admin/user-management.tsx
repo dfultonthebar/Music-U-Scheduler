@@ -12,9 +12,21 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, Users, UserPlus, GraduationCap, Crown, X, Shield, UserCheck, Music } from 'lucide-react';
+import { Plus, Trash2, Edit, Users, UserPlus, GraduationCap, Crown, X, Shield, UserCheck, Music, Link, Unlink } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { apiService } from '@/lib/api';
 import { User, CreateUserData, InstructorRole, InstructorWithRoles, PromoteToAdminData } from '@/lib/types';
+
+interface InstructorAssignment {
+  assignment_id: number;
+  instructor_id: number;
+  full_name: string;
+  email: string;
+  specializations: string | null;
+  instrument: string | null;
+  is_primary: boolean;
+  notes: string | null;
+}
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -25,6 +37,43 @@ export default function UserManagement() {
   const [showMultiRoleDialog, setShowMultiRoleDialog] = useState(false);
   const [selectedInstructor, setSelectedInstructor] = useState<User | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+
+  // Edit student state
+  const [showEditStudentDialog, setShowEditStudentDialog] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<User | null>(null);
+  const [editStudentData, setEditStudentData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    instrument: '',
+    notes: '',
+    emergency_contact: '',
+    address: '',
+    password: ''
+  });
+
+  // Edit instructor state
+  const [showEditInstructorDialog, setShowEditInstructorDialog] = useState(false);
+  const [editingInstructor, setEditingInstructor] = useState<User | null>(null);
+  const [editInstructorData, setEditInstructorData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    specializations: '',
+    notes: '',
+    hourly_rate: '',
+    password: ''
+  });
+
+  // Assign to instructor state
+  const [showAssignInstructorDialog, setShowAssignInstructorDialog] = useState(false);
+  const [studentToAssign, setStudentToAssign] = useState<User | null>(null);
+  const [studentInstructors, setStudentInstructors] = useState<InstructorAssignment[]>([]);
+  const [selectedInstructorForAssign, setSelectedInstructorForAssign] = useState<string>('');
+  const [assignInstrument, setAssignInstrument] = useState<string>('');
+  const [assignNotes, setAssignNotes] = useState<string>('');
+  const [assignIsPrimary, setAssignIsPrimary] = useState(true);
+
   const [createFormData, setCreateFormData] = useState<CreateUserData>({
     username: '',
     email: '',
@@ -208,7 +257,7 @@ export default function UserManagement() {
   const handleRemoveRole = async (instructorId: string, roleId: string) => {
     try {
       await apiService.removeInstructorRole(instructorId, roleId);
-      
+
       // Update local state
       setInstructorsWithRoles(prev => ({
         ...prev,
@@ -218,6 +267,159 @@ export default function UserManagement() {
       toast.success('Role removed successfully');
     } catch (error) {
       toast.error('Failed to remove role');
+    }
+  };
+
+  // Edit student handlers
+  const handleEditStudent = (student: User) => {
+    setEditingStudent(student);
+    setEditStudentData({
+      full_name: student.full_name || '',
+      email: student.email || '',
+      phone: student.phone || '',
+      instrument: student.instrument || '',
+      notes: student.notes || '',
+      emergency_contact: student.emergency_contact || '',
+      address: student.address || '',
+      password: ''
+    });
+    setShowEditStudentDialog(true);
+  };
+
+  // Edit instructor handlers
+  const handleEditInstructor = (instructor: User) => {
+    setEditingInstructor(instructor);
+    setEditInstructorData({
+      full_name: instructor.full_name || '',
+      email: instructor.email || '',
+      phone: instructor.phone || '',
+      specializations: instructor.specializations || '',
+      notes: instructor.notes || '',
+      hourly_rate: '',
+      password: ''
+    });
+    setShowEditInstructorDialog(true);
+  };
+
+  const handleSaveInstructor = async () => {
+    if (!editingInstructor) return;
+
+    try {
+      const updateData: Record<string, any> = {
+        full_name: editInstructorData.full_name || undefined,
+        email: editInstructorData.email || undefined,
+        phone: editInstructorData.phone || undefined,
+        specializations: editInstructorData.specializations || undefined,
+        notes: editInstructorData.notes || undefined
+      };
+
+      // Only include password if it was changed
+      if (editInstructorData.password && editInstructorData.password.length >= 8) {
+        updateData.password = editInstructorData.password;
+      } else if (editInstructorData.password && editInstructorData.password.length > 0) {
+        toast.error('Password must be at least 8 characters');
+        return;
+      }
+
+      // Only include hourly_rate if provided
+      if (editInstructorData.hourly_rate) {
+        updateData.hourly_rate = parseFloat(editInstructorData.hourly_rate);
+      }
+
+      const updatedUser = await apiService.updateUser(Number(editingInstructor.id), updateData);
+      setUsers(prev => prev.map(u => u.id === editingInstructor.id ? { ...u, ...updatedUser } : u));
+      setShowEditInstructorDialog(false);
+      setEditingInstructor(null);
+      toast.success('Instructor information updated successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update instructor');
+    }
+  };
+
+  const handleSaveStudent = async () => {
+    if (!editingStudent) return;
+
+    try {
+      const updateData: Record<string, any> = {
+        full_name: editStudentData.full_name || undefined,
+        email: editStudentData.email || undefined,
+        phone: editStudentData.phone || undefined,
+        instrument: editStudentData.instrument || undefined,
+        notes: editStudentData.notes || undefined,
+        emergency_contact: editStudentData.emergency_contact || undefined,
+        address: editStudentData.address || undefined
+      };
+
+      // Only include password if it was changed
+      if (editStudentData.password && editStudentData.password.length >= 8) {
+        updateData.password = editStudentData.password;
+      } else if (editStudentData.password && editStudentData.password.length > 0) {
+        toast.error('Password must be at least 8 characters');
+        return;
+      }
+
+      const updatedUser = await apiService.updateUser(Number(editingStudent.id), updateData);
+      setUsers(prev => prev.map(u => u.id === editingStudent.id ? { ...u, ...updatedUser } : u));
+      setShowEditStudentDialog(false);
+      setEditingStudent(null);
+      toast.success('Student information updated successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update student');
+    }
+  };
+
+  // Assign instructor handlers
+  const handleOpenAssignInstructor = async (student: User) => {
+    setStudentToAssign(student);
+    setAssignInstrument(student.instrument || '');
+    setAssignNotes('');
+    setAssignIsPrimary(true);
+    setSelectedInstructorForAssign('');
+
+    try {
+      const result = await apiService.getStudentInstructors(student.id);
+      setStudentInstructors(result.instructors || []);
+    } catch (error) {
+      setStudentInstructors([]);
+    }
+
+    setShowAssignInstructorDialog(true);
+  };
+
+  const handleAssignToInstructor = async () => {
+    if (!studentToAssign || !selectedInstructorForAssign) {
+      toast.error('Please select an instructor');
+      return;
+    }
+
+    try {
+      await apiService.assignStudentToInstructor({
+        student_id: Number(studentToAssign.id),
+        instructor_id: Number(selectedInstructorForAssign),
+        instrument: assignInstrument || undefined,
+        is_primary: assignIsPrimary,
+        notes: assignNotes || undefined
+      });
+
+      // Refresh the assignments
+      const result = await apiService.getStudentInstructors(studentToAssign.id);
+      setStudentInstructors(result.instructors || []);
+
+      setSelectedInstructorForAssign('');
+      setAssignNotes('');
+      toast.success('Student assigned to instructor successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to assign student');
+    }
+  };
+
+  const handleRemoveInstructorAssignment = async (assignmentId: number) => {
+    try {
+      await apiService.removeStudentInstructorAssignment(assignmentId);
+      setStudentInstructors(prev => prev.filter(a => a.assignment_id !== assignmentId));
+      toast.success('Assignment removed successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to remove assignment');
     }
   };
 
@@ -503,15 +705,24 @@ export default function UserManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditInstructor(instructor)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Edit className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
                     {instructor.role !== 'admin' && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handlePromoteToAdmin(instructor)}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
                       >
                         <Crown className="w-4 h-4 mr-1" />
-                        Make Admin
+                        Admin
                       </Button>
                     )}
                     {instructor.role === 'admin' && (
@@ -527,18 +738,8 @@ export default function UserManagement() {
                       className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
                     >
                       <UserCheck className="w-4 h-4 mr-1" />
-                      Manage Roles
+                      Roles
                     </Button>
-                    <Select onValueChange={(value) => handleAssignInstructorRole(instructor.id, value)}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Quick assign" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {instructorRoles.map((role) => (
-                          <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
@@ -601,6 +802,24 @@ export default function UserManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditStudent(student)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Edit className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenAssignInstructor(student)}
+                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                    >
+                      <Link className="w-4 h-4 mr-1" />
+                      Assign
+                    </Button>
                     <Select value={student.role} onValueChange={(value) => handleRoleChange(student.id, value)}>
                       <SelectTrigger className="w-32">
                         <SelectValue />
@@ -626,7 +845,7 @@ export default function UserManagement() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
+                          <AlertDialogAction
                             onClick={() => handleDeleteUser(student.id, `${student.first_name} ${student.last_name}`)}
                             className="bg-red-600 hover:bg-red-700"
                           >
@@ -751,6 +970,397 @@ export default function UserManagement() {
             </Button>
             <Button onClick={handleUpdateInstructorRoles}>
               Update Roles ({selectedRoles.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Student Dialog */}
+      <Dialog open={showEditStudentDialog} onOpenChange={(open) => {
+        setShowEditStudentDialog(open);
+        if (!open) {
+          setEditingStudent(null);
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Student Information</DialogTitle>
+            <DialogDescription>
+              {editingStudent ? `Update details for ${editingStudent.first_name} ${editingStudent.last_name}` : 'Edit student details'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_full_name" className="text-right">Full Name</Label>
+              <Input
+                id="edit_full_name"
+                value={editStudentData.full_name}
+                onChange={(e) => setEditStudentData({ ...editStudentData, full_name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_email" className="text-right">Email</Label>
+              <Input
+                id="edit_email"
+                type="email"
+                value={editStudentData.email}
+                onChange={(e) => setEditStudentData({ ...editStudentData, email: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_phone" className="text-right">Phone</Label>
+              <Input
+                id="edit_phone"
+                type="tel"
+                value={editStudentData.phone}
+                onChange={(e) => setEditStudentData({ ...editStudentData, phone: e.target.value })}
+                className="col-span-3"
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_instrument" className="text-right flex items-center justify-end gap-1">
+                <Music className="w-4 h-4" />
+                Instrument
+              </Label>
+              <Select
+                value={editStudentData.instrument || ''}
+                onValueChange={(value) => setEditStudentData({ ...editStudentData, instrument: value })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select instrument" />
+                </SelectTrigger>
+                <SelectContent>
+                  {instruments.map((instrument) => (
+                    <SelectItem key={instrument} value={instrument}>
+                      {instrument}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_emergency_contact" className="text-right">Emergency Contact</Label>
+              <Input
+                id="edit_emergency_contact"
+                value={editStudentData.emergency_contact}
+                onChange={(e) => setEditStudentData({ ...editStudentData, emergency_contact: e.target.value })}
+                className="col-span-3"
+                placeholder="Name: (555) 123-4567"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_address" className="text-right">Address</Label>
+              <Input
+                id="edit_address"
+                value={editStudentData.address}
+                onChange={(e) => setEditStudentData({ ...editStudentData, address: e.target.value })}
+                className="col-span-3"
+                placeholder="123 Main St, City, State"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="edit_notes" className="text-right pt-2">Notes</Label>
+              <Textarea
+                id="edit_notes"
+                value={editStudentData.notes}
+                onChange={(e) => setEditStudentData({ ...editStudentData, notes: e.target.value })}
+                className="col-span-3"
+                placeholder="Additional notes about the student..."
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
+              <Label htmlFor="edit_password" className="text-right">New Password</Label>
+              <Input
+                id="edit_password"
+                type="password"
+                value={editStudentData.password}
+                onChange={(e) => setEditStudentData({ ...editStudentData, password: e.target.value })}
+                className="col-span-3"
+                placeholder="Leave blank to keep current password"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground ml-auto col-span-3 text-right">
+              Password must be at least 8 characters if changing
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowEditStudentDialog(false);
+              setEditingStudent(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveStudent}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Instructor Dialog */}
+      <Dialog open={showEditInstructorDialog} onOpenChange={(open) => {
+        setShowEditInstructorDialog(open);
+        if (!open) {
+          setEditingInstructor(null);
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Instructor Information</DialogTitle>
+            <DialogDescription>
+              {editingInstructor ? `Update details for ${editingInstructor.full_name || editingInstructor.first_name + ' ' + editingInstructor.last_name}` : 'Edit instructor details'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_inst_full_name" className="text-right">Full Name</Label>
+              <Input
+                id="edit_inst_full_name"
+                value={editInstructorData.full_name}
+                onChange={(e) => setEditInstructorData({ ...editInstructorData, full_name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_inst_email" className="text-right">Email</Label>
+              <Input
+                id="edit_inst_email"
+                type="email"
+                value={editInstructorData.email}
+                onChange={(e) => setEditInstructorData({ ...editInstructorData, email: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_inst_phone" className="text-right">Phone</Label>
+              <Input
+                id="edit_inst_phone"
+                type="tel"
+                value={editInstructorData.phone}
+                onChange={(e) => setEditInstructorData({ ...editInstructorData, phone: e.target.value })}
+                className="col-span-3"
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_inst_specializations" className="text-right">Instruments</Label>
+              <Input
+                id="edit_inst_specializations"
+                value={editInstructorData.specializations}
+                onChange={(e) => setEditInstructorData({ ...editInstructorData, specializations: e.target.value })}
+                className="col-span-3"
+                placeholder="Piano, Guitar, Voice..."
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit_inst_rate" className="text-right">Hourly Rate</Label>
+              <Input
+                id="edit_inst_rate"
+                type="number"
+                value={editInstructorData.hourly_rate}
+                onChange={(e) => setEditInstructorData({ ...editInstructorData, hourly_rate: e.target.value })}
+                className="col-span-3"
+                placeholder="e.g., 50.00"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="edit_inst_notes" className="text-right pt-2">Notes</Label>
+              <Textarea
+                id="edit_inst_notes"
+                value={editInstructorData.notes}
+                onChange={(e) => setEditInstructorData({ ...editInstructorData, notes: e.target.value })}
+                className="col-span-3"
+                placeholder="Additional notes about the instructor..."
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4 border-t pt-4">
+              <Label htmlFor="edit_inst_password" className="text-right">New Password</Label>
+              <Input
+                id="edit_inst_password"
+                type="password"
+                value={editInstructorData.password}
+                onChange={(e) => setEditInstructorData({ ...editInstructorData, password: e.target.value })}
+                className="col-span-3"
+                placeholder="Leave blank to keep current password"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground ml-auto col-span-3 text-right">
+              Password must be at least 8 characters if changing
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowEditInstructorDialog(false);
+              setEditingInstructor(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveInstructor}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign to Instructor Dialog */}
+      <Dialog open={showAssignInstructorDialog} onOpenChange={(open) => {
+        setShowAssignInstructorDialog(open);
+        if (!open) {
+          setStudentToAssign(null);
+          setStudentInstructors([]);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link className="w-5 h-5" />
+              Assign Student to Instructor
+            </DialogTitle>
+            <DialogDescription>
+              {studentToAssign ? `Manage instructor assignments for ${studentToAssign.first_name} ${studentToAssign.last_name}` : 'Assign instructors'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Current Instructor Assignments */}
+            <div>
+              <Label className="text-base font-medium">Current Instructor Assignments</Label>
+              {studentInstructors.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {studentInstructors.map((assignment) => (
+                    <div key={assignment.assignment_id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-medium">
+                          {assignment.full_name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div>
+                          <p className="font-medium">{assignment.full_name}</p>
+                          <p className="text-sm text-gray-500">{assignment.email}</p>
+                          {assignment.instrument && (
+                            <Badge variant="outline" className="mt-1">
+                              <Music className="w-3 h-3 mr-1" />
+                              {assignment.instrument}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {assignment.is_primary && (
+                          <Badge className="bg-green-100 text-green-800">Primary</Badge>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleRemoveInstructorAssignment(assignment.assignment_id)}
+                        >
+                          <Unlink className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-2 p-4 text-center text-gray-500 border border-dashed rounded-lg">
+                  <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No instructors assigned yet</p>
+                </div>
+              )}
+            </div>
+
+            {/* Add New Assignment */}
+            <div className="border-t pt-4">
+              <Label className="text-base font-medium">Add Instructor Assignment</Label>
+              <div className="mt-3 space-y-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Instructor</Label>
+                  <Select
+                    value={selectedInstructorForAssign}
+                    onValueChange={setSelectedInstructorForAssign}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select instructor..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {instructors
+                        .filter(i => !studentInstructors.some(si => si.instructor_id === Number(i.id)))
+                        .map((instructor) => (
+                          <SelectItem key={String(instructor.id)} value={String(instructor.id)}>
+                            {instructor.full_name || `${instructor.first_name} ${instructor.last_name}`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right flex items-center justify-end gap-1">
+                    <Music className="w-4 h-4" />
+                    Instrument
+                  </Label>
+                  <Select
+                    value={assignInstrument}
+                    onValueChange={setAssignInstrument}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select instrument for lessons..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {instruments.map((instrument) => (
+                        <SelectItem key={instrument} value={instrument}>
+                          {instrument}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Primary</Label>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={assignIsPrimary}
+                      onChange={(e) => setAssignIsPrimary(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-600">This is the primary instructor for this student</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">Notes</Label>
+                  <Textarea
+                    value={assignNotes}
+                    onChange={(e) => setAssignNotes(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Optional notes about this assignment..."
+                    rows={2}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={handleAssignToInstructor} disabled={!selectedInstructorForAssign}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Assign Instructor
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowAssignInstructorDialog(false);
+              setStudentToAssign(null);
+              setStudentInstructors([]);
+            }}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

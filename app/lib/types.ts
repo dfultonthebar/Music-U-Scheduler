@@ -17,9 +17,15 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
+  full_name?: string;
   phone?: string;
   role: 'admin' | 'instructor' | 'student';
   is_active: boolean;
+  instrument?: string;
+  notes?: string;
+  emergency_contact?: string;
+  address?: string;
+  specializations?: string;
   created_at: string;
   updated_at: string;
   assigned_roles?: InstructorRoleRef[];
@@ -56,6 +62,12 @@ export interface Lesson {
   duration_minutes: number;
   status: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
   notes?: string;
+  instructor_notes?: string;
+  homework_assigned?: string;
+  progress_notes?: string;
+  actual_start_time?: string;
+  actual_end_time?: string;
+  actual_duration_minutes?: number;
   created_at: string;
   updated_at: string;
 }

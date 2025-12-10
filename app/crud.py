@@ -110,10 +110,54 @@ def delete_user(db: Session, user_id: int, deleted_by: Optional[int] = None):
         # Delete related lessons where user is the student
         db.query(models.Lesson).filter(models.Lesson.student_id == user_id).delete(synchronize_session=False)
 
+        # Delete related lessons where user is the teacher (instructor)
+        db.query(models.Lesson).filter(models.Lesson.teacher_id == user_id).delete(synchronize_session=False)
+
         # Set created_by to NULL for lessons created by this user (if they were an admin/instructor)
         db.query(models.Lesson).filter(models.Lesson.created_by == user_id).update(
             {models.Lesson.created_by: None}, synchronize_session=False
         )
+
+        # Delete instructor availability records
+        db.query(models.InstructorAvailability).filter(
+            models.InstructorAvailability.instructor_id == user_id
+        ).delete(synchronize_session=False)
+
+        # Delete availability exceptions (days off)
+        db.query(models.AvailabilityException).filter(
+            models.AvailabilityException.instructor_id == user_id
+        ).delete(synchronize_session=False)
+
+        # Delete lesson templates where user is instructor or student
+        db.query(models.LessonTemplate).filter(
+            models.LessonTemplate.instructor_id == user_id
+        ).delete(synchronize_session=False)
+        db.query(models.LessonTemplate).filter(
+            models.LessonTemplate.student_id == user_id
+        ).delete(synchronize_session=False)
+
+        # Delete student-instructor assignments
+        db.query(models.StudentInstructorAssignment).filter(
+            models.StudentInstructorAssignment.student_id == user_id
+        ).delete(synchronize_session=False)
+        db.query(models.StudentInstructorAssignment).filter(
+            models.StudentInstructorAssignment.instructor_id == user_id
+        ).delete(synchronize_session=False)
+
+        # Delete password reset tokens
+        db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.user_id == user_id
+        ).delete(synchronize_session=False)
+
+        # Set approved_user_id to NULL for student registrations
+        db.query(models.StudentRegistration).filter(
+            models.StudentRegistration.approved_user_id == user_id
+        ).update({models.StudentRegistration.approved_user_id: None}, synchronize_session=False)
+
+        # Set user_id to NULL for audit logs (preserve the log but remove user reference)
+        db.query(models.AuditLog).filter(
+            models.AuditLog.user_id == user_id
+        ).update({models.AuditLog.user_id: None}, synchronize_session=False)
 
         # Delete the user
         db.delete(db_user)
@@ -456,12 +500,21 @@ def get_instructor_dashboard_stats(db: Session, instructor_id: int) -> Dict[str,
         )
     ).scalar()
     
-    # Get upcoming lessons
-    upcoming_lessons = get_lessons_by_teacher(db, instructor_id, limit=5, 
-                                            status=models.LessonStatus.SCHEDULED)
-    
+    # Get upcoming lessons with teacher and student names
+    upcoming_lessons_raw = db.query(models.Lesson).options(
+        joinedload(models.Lesson.teacher),
+        joinedload(models.Lesson.student)
+    ).filter(
+        and_(
+            models.Lesson.teacher_id == instructor_id,
+            models.Lesson.status == models.LessonStatus.SCHEDULED,
+            models.Lesson.scheduled_at >= now
+        )
+    ).order_by(models.Lesson.scheduled_at).limit(5).all()
+
     # Get recent completed lessons
-    recent_lessons = db.query(models.Lesson).options(
+    recent_lessons_raw = db.query(models.Lesson).options(
+        joinedload(models.Lesson.teacher),
         joinedload(models.Lesson.student)
     ).filter(
         and_(
@@ -469,7 +522,24 @@ def get_instructor_dashboard_stats(db: Session, instructor_id: int) -> Dict[str,
             models.Lesson.status == models.LessonStatus.COMPLETED
         )
     ).order_by(desc(models.Lesson.scheduled_at)).limit(5).all()
-    
+
+    # Convert lessons to summaries with teacher/student names
+    def lesson_to_summary(lesson):
+        return {
+            "id": lesson.id,
+            "title": lesson.title,
+            "scheduled_at": lesson.scheduled_at,
+            "duration_minutes": lesson.duration_minutes,
+            "break_after_minutes": lesson.break_after_minutes or 0,
+            "status": lesson.status.value if hasattr(lesson.status, 'value') else lesson.status,
+            "teacher_name": lesson.teacher.full_name if lesson.teacher else "Unknown",
+            "student_name": lesson.student.full_name if lesson.student else "Unknown",
+            "instrument": lesson.instrument
+        }
+
+    upcoming_lessons = [lesson_to_summary(l) for l in upcoming_lessons_raw]
+    recent_lessons = [lesson_to_summary(l) for l in recent_lessons_raw]
+
     return {
         "total_students": total_students,
         "lessons_today": lessons_today,

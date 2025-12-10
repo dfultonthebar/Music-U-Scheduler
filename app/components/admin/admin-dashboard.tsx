@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { DashboardStats, User, Lesson, AuditLog } from '@/lib/types';
 import { toast } from 'sonner';
+import { formatDateTimeCST, formatDateCST } from '@/lib/timezone';
 import UserManagement from './user-management';
 import RoleManagement from './role-management';
 import EmailSettings from './email-settings';
@@ -301,7 +302,7 @@ export default function AdminDashboard() {
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-900">{log?.action || 'System action'}</p>
                           <p className="text-xs text-gray-500">
-                            {log?.created_at ? new Date(log.created_at).toLocaleString() : 'Recently'}
+                            {log?.created_at ? formatDateTimeCST(log.created_at) : 'Recently'}
                           </p>
                         </div>
                       </div>
@@ -392,8 +393,20 @@ export default function AdminDashboard() {
           <TabsContent value="lessons" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Lesson Management</CardTitle>
-                <CardDescription>View and manage all lessons in the system</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Lesson Management</CardTitle>
+                    <CardDescription>View and manage all lessons in the system</CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => setActiveTab('schedule')}
+                    className="flex items-center gap-2"
+                    data-testid="create-lesson-button"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Create Lesson
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -412,7 +425,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex items-center gap-4 text-sm text-gray-500">
                           <span>Duration: {lesson?.duration_minutes || 60} min</span>
-                          <span>Scheduled: {lesson?.scheduled_at ? new Date(lesson.scheduled_at).toLocaleDateString() : 'Not set'}</span>
+                          <span>Scheduled: {lesson?.scheduled_at ? formatDateCST(lesson.scheduled_at) : 'Not set'}</span>
                         </div>
                         {lesson?.description && (
                           <p className="text-sm text-gray-600 mt-2">{lesson.description}</p>
@@ -424,6 +437,15 @@ export default function AdminDashboard() {
                       <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
                       <p className="text-lg font-medium">No lessons found</p>
                       <p className="text-sm">Lessons will appear here once scheduled</p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setActiveTab('schedule')}
+                        className="mt-4"
+                        data-testid="create-first-lesson-button"
+                      >
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Schedule Your First Lesson
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -495,7 +517,7 @@ export default function AdminDashboard() {
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-gray-900">{log?.action || 'System Action'}</span>
                           <span className="text-sm text-gray-500">
-                            {log?.created_at ? new Date(log.created_at).toLocaleString() : 'Recently'}
+                            {log?.created_at ? formatDateTimeCST(log.created_at) : 'Recently'}
                           </span>
                         </div>
                         <div className="text-sm text-gray-600">

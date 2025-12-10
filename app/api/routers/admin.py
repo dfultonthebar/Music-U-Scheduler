@@ -2508,3 +2508,262 @@ async def get_yodeck_instructor_slides(
             detail=f"Error fetching instructor slides: {str(e)}"
         )
 
+
+# ==================== Student-Instructor Assignment Endpoints ====================
+
+@router.get("/students/{student_id}/instructors")
+async def get_student_instructors(
+    student_id: int,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all instructors assigned to a student"""
+    student = db.query(models.User).filter(
+        models.User.id == student_id,
+        models.User.role == models.UserRole.STUDENT
+    ).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    assignments = db.query(models.StudentInstructorAssignment).filter(
+        models.StudentInstructorAssignment.student_id == student_id,
+        models.StudentInstructorAssignment.is_active == True
+    ).all()
+
+    instructors = []
+    for assignment in assignments:
+        instructor = db.query(models.User).filter(
+            models.User.id == assignment.instructor_id
+        ).first()
+        if instructor:
+            instructors.append({
+                "assignment_id": assignment.id,
+                "instructor_id": instructor.id,
+                "full_name": instructor.full_name,
+                "email": instructor.email,
+                "specializations": instructor.specializations,
+                "profile_image": instructor.profile_image,
+                "instrument": assignment.instrument,
+                "is_primary": assignment.is_primary,
+                "notes": assignment.notes
+            })
+
+    return {
+        "student_id": student_id,
+        "student_name": student.full_name,
+        "instructors": instructors
+    }
+
+
+@router.get("/instructors/{instructor_id}/assigned-students")
+async def get_instructor_assigned_students(
+    instructor_id: int,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all students assigned to an instructor"""
+    instructor = db.query(models.User).filter(
+        models.User.id == instructor_id,
+        models.User.role == models.UserRole.INSTRUCTOR
+    ).first()
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+
+    assignments = db.query(models.StudentInstructorAssignment).filter(
+        models.StudentInstructorAssignment.instructor_id == instructor_id,
+        models.StudentInstructorAssignment.is_active == True
+    ).all()
+
+    students = []
+    for assignment in assignments:
+        student = db.query(models.User).filter(
+            models.User.id == assignment.student_id
+        ).first()
+        if student:
+            students.append({
+                "assignment_id": assignment.id,
+                "student_id": student.id,
+                "full_name": student.full_name,
+                "email": student.email,
+                "phone": student.phone,
+                "instrument": assignment.instrument or student.instrument,
+                "is_primary": assignment.is_primary,
+                "notes": assignment.notes
+            })
+
+    return {
+        "instructor_id": instructor_id,
+        "instructor_name": instructor.full_name,
+        "students": students
+    }
+
+
+@router.post("/student-instructor-assignments")
+async def assign_student_to_instructor(
+    assignment: schemas.StudentInstructorAssignmentCreate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Assign a student to an instructor"""
+    # Verify student exists
+    student = db.query(models.User).filter(
+        models.User.id == assignment.student_id,
+        models.User.role == models.UserRole.STUDENT
+    ).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    # Verify instructor exists
+    instructor = db.query(models.User).filter(
+        models.User.id == assignment.instructor_id,
+        models.User.role == models.UserRole.INSTRUCTOR
+    ).first()
+    if not instructor:
+        raise HTTPException(status_code=404, detail="Instructor not found")
+
+    # Check if assignment already exists
+    existing = db.query(models.StudentInstructorAssignment).filter(
+        models.StudentInstructorAssignment.student_id == assignment.student_id,
+        models.StudentInstructorAssignment.instructor_id == assignment.instructor_id,
+        models.StudentInstructorAssignment.is_active == True
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Student is already assigned to this instructor")
+
+    # If this is a primary assignment, unset other primary assignments for this student
+    if assignment.is_primary:
+        db.query(models.StudentInstructorAssignment).filter(
+            models.StudentInstructorAssignment.student_id == assignment.student_id,
+            models.StudentInstructorAssignment.is_primary == True,
+            models.StudentInstructorAssignment.is_active == True
+        ).update({"is_primary": False})
+
+    # Create the assignment
+    db_assignment = models.StudentInstructorAssignment(
+        student_id=assignment.student_id,
+        instructor_id=assignment.instructor_id,
+        instrument=assignment.instrument or student.instrument,
+        is_primary=assignment.is_primary,
+        notes=assignment.notes,
+        is_active=True
+    )
+    db.add(db_assignment)
+    db.commit()
+    db.refresh(db_assignment)
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "CREATE", "student_instructor_assignment", db_assignment.id,
+        f"Admin assigned student {student.full_name} to instructor {instructor.full_name}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return {
+        "message": f"Successfully assigned {student.full_name} to {instructor.full_name}",
+        "assignment_id": db_assignment.id,
+        "student_name": student.full_name,
+        "instructor_name": instructor.full_name
+    }
+
+
+@router.put("/student-instructor-assignments/{assignment_id}")
+async def update_student_instructor_assignment(
+    assignment_id: int,
+    update_data: schemas.StudentInstructorAssignmentUpdate,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Update a student-instructor assignment"""
+    assignment = db.query(models.StudentInstructorAssignment).filter(
+        models.StudentInstructorAssignment.id == assignment_id
+    ).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    # If setting as primary, unset other primary assignments for this student
+    if update_data.is_primary:
+        db.query(models.StudentInstructorAssignment).filter(
+            models.StudentInstructorAssignment.student_id == assignment.student_id,
+            models.StudentInstructorAssignment.is_primary == True,
+            models.StudentInstructorAssignment.is_active == True,
+            models.StudentInstructorAssignment.id != assignment_id
+        ).update({"is_primary": False})
+
+    # Update the assignment
+    update_dict = update_data.dict(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(assignment, key, value)
+
+    db.commit()
+    db.refresh(assignment)
+
+    return {"message": "Assignment updated successfully", "assignment_id": assignment_id}
+
+
+@router.delete("/student-instructor-assignments/{assignment_id}")
+async def remove_student_instructor_assignment(
+    assignment_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Remove a student-instructor assignment (soft delete)"""
+    assignment = db.query(models.StudentInstructorAssignment).filter(
+        models.StudentInstructorAssignment.id == assignment_id
+    ).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    # Get names for logging
+    student = db.query(models.User).filter(models.User.id == assignment.student_id).first()
+    instructor = db.query(models.User).filter(models.User.id == assignment.instructor_id).first()
+
+    # Soft delete
+    assignment.is_active = False
+    db.commit()
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "DELETE", "student_instructor_assignment", assignment_id,
+        f"Admin removed assignment of {student.full_name if student else 'Unknown'} from {instructor.full_name if instructor else 'Unknown'}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return {"message": "Assignment removed successfully"}
+
+
+@router.get("/student-instructor-assignments")
+async def get_all_assignments(
+    current_user: models.User = Depends(require_admin_role),
+    db: Session = Depends(get_db)
+):
+    """Get all active student-instructor assignments"""
+    assignments = db.query(models.StudentInstructorAssignment).filter(
+        models.StudentInstructorAssignment.is_active == True
+    ).all()
+
+    result = []
+    for assignment in assignments:
+        student = db.query(models.User).filter(models.User.id == assignment.student_id).first()
+        instructor = db.query(models.User).filter(models.User.id == assignment.instructor_id).first()
+        if student and instructor:
+            result.append({
+                "id": assignment.id,
+                "student_id": student.id,
+                "student_name": student.full_name,
+                "student_email": student.email,
+                "instructor_id": instructor.id,
+                "instructor_name": instructor.full_name,
+                "instructor_email": instructor.email,
+                "instrument": assignment.instrument,
+                "is_primary": assignment.is_primary,
+                "notes": assignment.notes,
+                "created_at": assignment.created_at
+            })
+
+    return result
+

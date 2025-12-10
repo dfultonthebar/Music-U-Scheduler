@@ -201,6 +201,9 @@ class Lesson(LessonBase):
     admin_notes: Optional[str] = None
     homework_assigned: Optional[str] = None
     progress_notes: Optional[str] = None
+    actual_start_time: Optional[datetime] = None
+    actual_end_time: Optional[datetime] = None
+    actual_duration_minutes: Optional[int] = None
     created_by: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -481,6 +484,82 @@ class EmailTestResult(BaseModel):
 
 
 # Student Self-Registration Schemas
+# Student-Instructor Assignment Schemas
+class StudentInstructorAssignmentCreate(BaseModel):
+    student_id: int
+    instructor_id: int
+    instrument: Optional[str] = None
+    is_primary: bool = True
+    notes: Optional[str] = None
+
+
+class StudentInstructorAssignmentUpdate(BaseModel):
+    instrument: Optional[str] = None
+    is_primary: Optional[bool] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class StudentInstructorAssignment(BaseModel):
+    id: int
+    student_id: int
+    instructor_id: int
+    instrument: Optional[str] = None
+    is_primary: bool
+    notes: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class StudentWithInstructors(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    instrument: Optional[str] = None
+    assigned_instructors: List["InstructorBasic"] = []
+
+    class Config:
+        from_attributes = True
+
+
+class InstructorBasic(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    specializations: Optional[str] = None
+    profile_image: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class InstructorWithStudents(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    specializations: Optional[str] = None
+    assigned_students: List["StudentBasic"] = []
+
+    class Config:
+        from_attributes = True
+
+
+class StudentBasic(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    instrument: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class StudentRegistrationRequest(BaseModel):
     email: EmailStr
     full_name: str

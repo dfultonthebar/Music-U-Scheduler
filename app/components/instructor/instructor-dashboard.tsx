@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import {
@@ -28,10 +30,16 @@ import {
   TrendingUp,
   Settings,
   RotateCcw,
-  ChevronDown
+  ChevronDown,
+  Edit,
+  Plus,
+  Play,
+  Square,
+  Timer
 } from 'lucide-react';
 import { Lesson, Student, Instructor } from '@/lib/types';
 import { toast } from 'sonner';
+import { formatDateTimeCST, formatDateCST, formatTimeCST, createCSTDateTime } from '@/lib/timezone';
 import AvailabilityManager from './availability-manager';
 import DaysOffManager from './days-off-manager';
 
@@ -46,6 +54,45 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(true);
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [availabilityText, setAvailabilityText] = useState('');
+
+  // Edit profile state
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editProfileData, setEditProfileData] = useState({
+    bio: '',
+    hourly_rate: '',
+    phone: '',
+    specializations: ''
+  });
+
+  // Schedule lesson state
+  const [showScheduleLessonModal, setShowScheduleLessonModal] = useState(false);
+  const [scheduleLessonData, setScheduleLessonData] = useState({
+    title: '',
+    description: '',
+    student_id: '',
+    scheduled_date: '',
+    scheduled_time: '',
+    duration_minutes: '60',
+    instrument: '',
+    location: '',
+    room_number: ''
+  });
+  const [isScheduling, setIsScheduling] = useState(false);
+
+  // Edit lesson notes state
+  const [showEditLessonModal, setShowEditLessonModal] = useState(false);
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [editLessonData, setEditLessonData] = useState({
+    instructor_notes: '',
+    homework_assigned: '',
+    progress_notes: '',
+    notes: ''
+  });
+  const [isSavingLesson, setIsSavingLesson] = useState(false);
+
+  // Lesson time tracking state
+  const [startingLessonId, setStartingLessonId] = useState<string | null>(null);
+  const [endingLessonId, setEndingLessonId] = useState<string | null>(null);
 
   // Check if user can switch to admin role
   const canSwitchToAdmin = () => {
@@ -79,6 +126,175 @@ export default function InstructorDashboard() {
       }
     } catch (error) {
       toast.error('Failed to save availability');
+    }
+  };
+
+  // Edit profile handlers
+  const handleEditProfile = () => {
+    setEditProfileData({
+      bio: profile?.bio || '',
+      hourly_rate: profile?.hourly_rate?.toString() || '',
+      phone: user?.phone || '',
+      specializations: profile?.specialties?.join(', ') || ''
+    });
+    setShowEditProfileModal(true);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      const updateData: any = {
+        bio: editProfileData.bio || undefined,
+        hourly_rate: editProfileData.hourly_rate ? parseFloat(editProfileData.hourly_rate) : undefined,
+        phone: editProfileData.phone || undefined,
+        specializations: editProfileData.specializations || undefined
+      };
+
+      // Call API to update profile
+      await apiService.updateInstructorProfile(updateData);
+
+      toast.success('Profile updated successfully!');
+      setShowEditProfileModal(false);
+
+      // Reload data to reflect changes
+      loadInstructorData();
+    } catch (error: any) {
+      console.error('Failed to save profile:', error);
+      toast.error(error?.message || 'Failed to save profile');
+    }
+  };
+
+  // Schedule lesson handlers
+  const handleOpenScheduleLesson = () => {
+    // Reset form data
+    setScheduleLessonData({
+      title: '',
+      description: '',
+      student_id: '',
+      scheduled_date: '',
+      scheduled_time: '',
+      duration_minutes: '60',
+      instrument: '',
+      location: '',
+      room_number: ''
+    });
+    setShowScheduleLessonModal(true);
+  };
+
+  const handleScheduleLesson = async () => {
+    if (!scheduleLessonData.student_id || !scheduleLessonData.scheduled_date || !scheduleLessonData.scheduled_time) {
+      toast.error('Please select a student, date, and time');
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error('Unable to identify instructor');
+      return;
+    }
+
+    setIsScheduling(true);
+    try {
+      // Combine date and time
+      const scheduledAt = new Date(`${scheduleLessonData.scheduled_date}T${scheduleLessonData.scheduled_time}`);
+
+      // Get student name for title
+      const selectedStudent = students.find(s => String(s.id) === scheduleLessonData.student_id);
+      const studentName = selectedStudent?.full_name || selectedStudent?.username || 'Student';
+
+      const lessonData = {
+        title: scheduleLessonData.title || `Lesson with ${studentName}`,
+        description: scheduleLessonData.description || undefined,
+        teacher_id: parseInt(String(user.id)),
+        student_id: parseInt(scheduleLessonData.student_id),
+        scheduled_at: scheduledAt.toISOString(),
+        duration_minutes: parseInt(scheduleLessonData.duration_minutes),
+        instrument: scheduleLessonData.instrument || undefined,
+        location: scheduleLessonData.location || undefined,
+        room_number: scheduleLessonData.room_number || undefined,
+      };
+
+      await apiService.createInstructorLesson(lessonData);
+
+      toast.success('Lesson scheduled successfully!');
+      setShowScheduleLessonModal(false);
+
+      // Reload lessons
+      loadInstructorData();
+    } catch (error: any) {
+      console.error('Failed to schedule lesson:', error);
+      toast.error(error?.message || 'Failed to schedule lesson');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  // Edit lesson notes handlers
+  const handleOpenEditLesson = (lesson: Lesson) => {
+    setEditingLesson(lesson);
+    setEditLessonData({
+      instructor_notes: (lesson as any).instructor_notes || '',
+      homework_assigned: (lesson as any).homework_assigned || '',
+      progress_notes: (lesson as any).progress_notes || '',
+      notes: lesson.notes || ''
+    });
+    setShowEditLessonModal(true);
+  };
+
+  const handleSaveLessonNotes = async () => {
+    if (!editingLesson?.id) {
+      toast.error('No lesson selected');
+      return;
+    }
+
+    setIsSavingLesson(true);
+    try {
+      await apiService.updateInstructorLesson(parseInt(String(editingLesson.id)), {
+        instructor_notes: editLessonData.instructor_notes || undefined,
+        homework_assigned: editLessonData.homework_assigned || undefined,
+        progress_notes: editLessonData.progress_notes || undefined,
+        notes: editLessonData.notes || undefined
+      });
+
+      toast.success('Lesson notes saved successfully!');
+      setShowEditLessonModal(false);
+      setEditingLesson(null);
+
+      // Reload lessons to show updated notes
+      loadInstructorData();
+    } catch (error: any) {
+      console.error('Failed to save lesson notes:', error);
+      toast.error(error?.message || 'Failed to save lesson notes');
+    } finally {
+      setIsSavingLesson(false);
+    }
+  };
+
+  // Lesson time tracking handlers
+  const handleStartLesson = async (lessonId: string) => {
+    setStartingLessonId(lessonId);
+    try {
+      await apiService.startLesson(parseInt(lessonId));
+      toast.success('Lesson started! Time tracking has begun.');
+      loadInstructorData();
+    } catch (error: any) {
+      console.error('Failed to start lesson:', error);
+      toast.error(error?.message || 'Failed to start lesson');
+    } finally {
+      setStartingLessonId(null);
+    }
+  };
+
+  const handleEndLesson = async (lessonId: string) => {
+    setEndingLessonId(lessonId);
+    try {
+      const updatedLesson = await apiService.endLesson(parseInt(lessonId));
+      const actualDuration = (updatedLesson as any).actual_duration_minutes;
+      toast.success(`Lesson ended! Duration: ${actualDuration} minutes`);
+      loadInstructorData();
+    } catch (error: any) {
+      console.error('Failed to end lesson:', error);
+      toast.error(error?.message || 'Failed to end lesson');
+    } finally {
+      setEndingLessonId(null);
     }
   };
 
@@ -237,7 +453,7 @@ export default function InstructorDashboard() {
               />
               <StatCard
                 title="Upcoming Lessons"
-                value={dashboardData?.upcoming_lessons}
+                value={Array.isArray(dashboardData?.upcoming_lessons) ? dashboardData.upcoming_lessons.length : dashboardData?.upcoming_lessons}
                 icon={Clock}
                 description="Lessons scheduled ahead"
                 color="orange"
@@ -269,7 +485,7 @@ export default function InstructorDashboard() {
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-900">{lesson?.title || 'Lesson'}</p>
                           <p className="text-xs text-gray-500">
-                            {lesson?.scheduled_at ? new Date(lesson.scheduled_at).toLocaleString() : 'Not scheduled'}
+                            {lesson?.scheduled_at ? formatDateTimeCST(lesson.scheduled_at) : 'Not scheduled'}
                           </p>
                         </div>
                         <Badge variant={
@@ -394,7 +610,7 @@ export default function InstructorDashboard() {
                       <div className="p-3 border border-gray-200 rounded-lg">
                         <label className="text-sm font-medium text-gray-500">Join Date</label>
                         <p className="text-sm text-gray-900 mt-1">
-                          {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Not available'}
+                          {user?.created_at ? formatDateCST(user.created_at) : 'Not available'}
                         </p>
                       </div>
                       <div className="p-3 border border-gray-200 rounded-lg">
@@ -408,7 +624,11 @@ export default function InstructorDashboard() {
                 </div>
 
                 <div className="pt-4 border-t border-gray-200">
-                  <Button className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700">
+                  <Button
+                    onClick={handleEditProfile}
+                    className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
                     Edit Profile
                   </Button>
                 </div>
@@ -419,9 +639,18 @@ export default function InstructorDashboard() {
           {/* Lessons Tab */}
           <TabsContent value="lessons" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>My Lessons</CardTitle>
-                <CardDescription>View and manage your teaching schedule</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>My Lessons</CardTitle>
+                  <CardDescription>View and manage your teaching schedule</CardDescription>
+                </div>
+                <Button
+                  onClick={handleOpenScheduleLesson}
+                  className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Schedule Lesson
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -438,27 +667,115 @@ export default function InstructorDashboard() {
                             } className={lesson?.status === 'completed' ? 'bg-green-100 text-green-800' : ''}>
                               {lesson?.status || 'scheduled'}
                             </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditLesson(lesson)}
+                              className="flex items-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" />
+                              Edit Notes
+                            </Button>
                           </div>
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            <span>{lesson?.duration_minutes || 60} minutes</span>
-                          </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
                             <span>
-                              {lesson?.scheduled_at ? 
-                                new Date(lesson.scheduled_at).toLocaleDateString() : 
+                              {lesson?.scheduled_at ?
+                                formatDateCST(lesson.scheduled_at) :
                                 'Not scheduled'
                               }
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            <span>Student ID: {lesson?.student_id || 'Not assigned'}</span>
+                            <Clock className="w-4 h-4 text-green-600" />
+                            <span className="font-medium">
+                              Start: {lesson?.scheduled_at ?
+                                formatTimeCST(lesson.scheduled_at) :
+                                'TBD'
+                              }
+                            </span>
                           </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-red-600" />
+                            <span className="font-medium">
+                              End: {lesson?.scheduled_at ?
+                                (() => {
+                                  const startTime = new Date(lesson.scheduled_at);
+                                  const endTime = new Date(startTime.getTime() + (lesson.duration_minutes || 60) * 60000);
+                                  return formatTimeCST(endTime);
+                                })() :
+                                'TBD'
+                              }
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            <span>
+                              {(() => {
+                                const student = students?.find(s => s.id === lesson?.student_id);
+                                return student?.full_name || student?.username || `Student #${lesson?.student_id}`;
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Duration and Time Tracking */}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {lesson?.duration_minutes || 60} min scheduled
+                          </Badge>
+
+                          {/* Time Tracking Buttons and Display */}
+                          {lesson?.status === 'scheduled' && !(lesson as any).actual_start_time && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleStartLesson(String(lesson.id))}
+                              disabled={startingLessonId === String(lesson.id)}
+                              className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+                            >
+                              <Play className="w-3 h-3" />
+                              {startingLessonId === String(lesson.id) ? 'Starting...' : 'Start Lesson'}
+                            </Button>
+                          )}
+
+                          {(lesson as any).actual_start_time && !(lesson as any).actual_end_time && (
+                            <>
+                              <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                                <Timer className="w-3 h-3" />
+                                In Progress
+                              </Badge>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleEndLesson(String(lesson.id))}
+                                disabled={endingLessonId === String(lesson.id)}
+                                className="flex items-center gap-1"
+                              >
+                                <Square className="w-3 h-3" />
+                                {endingLessonId === String(lesson.id) ? 'Ending...' : 'End Lesson'}
+                              </Button>
+                              <span className="text-xs text-gray-500">
+                                Started: {formatTimeCST((lesson as any).actual_start_time)}
+                              </span>
+                            </>
+                          )}
+
+                          {(lesson as any).actual_end_time && (
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" />
+                                Actual: {(lesson as any).actual_duration_minutes} min
+                              </Badge>
+                              <span className="text-xs text-gray-500">
+                                {formatTimeCST((lesson as any).actual_start_time)} -
+                                {formatTimeCST((lesson as any).actual_end_time)}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {lesson?.description && (
@@ -467,9 +784,31 @@ export default function InstructorDashboard() {
                           </p>
                         )}
 
+                        {/* Display instructor notes if available */}
+                        {(lesson as any)?.instructor_notes && (
+                          <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-100">
+                            <label className="text-xs font-medium text-blue-600 uppercase tracking-wide">Instructor Notes</label>
+                            <p className="text-sm text-gray-700 mt-1">{(lesson as any).instructor_notes}</p>
+                          </div>
+                        )}
+
+                        {(lesson as any)?.homework_assigned && (
+                          <div className="mt-2 p-3 bg-amber-50 rounded border border-amber-100">
+                            <label className="text-xs font-medium text-amber-600 uppercase tracking-wide">Homework Assigned</label>
+                            <p className="text-sm text-gray-700 mt-1">{(lesson as any).homework_assigned}</p>
+                          </div>
+                        )}
+
+                        {(lesson as any)?.progress_notes && (
+                          <div className="mt-2 p-3 bg-green-50 rounded border border-green-100">
+                            <label className="text-xs font-medium text-green-600 uppercase tracking-wide">Progress Notes</label>
+                            <p className="text-sm text-gray-700 mt-1">{(lesson as any).progress_notes}</p>
+                          </div>
+                        )}
+
                         {lesson?.notes && (
-                          <div className="mt-3">
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Notes</label>
+                          <div className="mt-2">
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">General Notes</label>
                             <p className="text-sm text-gray-600 mt-1">{lesson.notes}</p>
                           </div>
                         )}
@@ -501,13 +840,13 @@ export default function InstructorDashboard() {
                       <div key={student?.id || index} className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                         <div className="flex items-center gap-3 mb-3">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
-                            {student?.user?.first_name?.[0] || 'S'}{student?.user?.last_name?.[0] || ''}
+                            {(student?.full_name || student?.username || 'S')[0].toUpperCase()}
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">
-                              {student?.user?.first_name || 'Unknown'} {student?.user?.last_name || 'Student'}
+                              {student?.full_name || student?.username || 'Unknown Student'}
                             </p>
-                            <p className="text-xs text-gray-500">{student?.user?.email}</p>
+                            <p className="text-xs text-gray-500">{student?.email}</p>
                           </div>
                         </div>
                         
@@ -564,7 +903,7 @@ export default function InstructorDashboard() {
                               <p className="font-medium text-gray-900">{lesson?.title || 'Lesson'}</p>
                               <p className="text-sm text-gray-500">
                                 {lesson?.scheduled_at ? 
-                                  new Date(lesson.scheduled_at).toLocaleString() : 
+                                  formatDateTimeCST(lesson.scheduled_at) : 
                                   'Time TBD'
                                 }
                               </p>
@@ -672,6 +1011,304 @@ export default function InstructorDashboard() {
             </Button>
             <Button onClick={handleSaveAvailability} className="bg-gradient-to-r from-green-600 to-blue-600">
               Save Availability
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Lesson Modal */}
+      <Dialog open={showScheduleLessonModal} onOpenChange={setShowScheduleLessonModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Schedule New Lesson</DialogTitle>
+            <DialogDescription>
+              Create a new lesson with one of your students.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label htmlFor="student">Student *</Label>
+                <select
+                  id="student"
+                  value={scheduleLessonData.student_id}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, student_id: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a student</option>
+                  {students?.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.full_name || student.username || 'Unknown Student'}
+                    </option>
+                  ))}
+                </select>
+                {students?.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No students assigned yet. Ask your admin to assign students to you.
+                  </p>
+                )}
+              </div>
+
+              <div className="col-span-2">
+                <Label htmlFor="title">Lesson Title</Label>
+                <Input
+                  id="title"
+                  placeholder="e.g., Piano Lesson"
+                  value={scheduleLessonData.title}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, title: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="date">Date *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={scheduleLessonData.scheduled_date}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, scheduled_date: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="time">Time *</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  value={scheduleLessonData.scheduled_time}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, scheduled_time: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="duration">Duration (minutes)</Label>
+                <select
+                  id="duration"
+                  value={scheduleLessonData.duration_minutes}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, duration_minutes: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="30">30 minutes</option>
+                  <option value="45">45 minutes</option>
+                  <option value="60">60 minutes</option>
+                  <option value="90">90 minutes</option>
+                  <option value="120">120 minutes</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="instrument">Instrument</Label>
+                <Input
+                  id="instrument"
+                  placeholder="e.g., Piano"
+                  value={scheduleLessonData.instrument}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, instrument: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  placeholder="e.g., Studio A"
+                  value={scheduleLessonData.location}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, location: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="room">Room Number</Label>
+                <Input
+                  id="room"
+                  placeholder="e.g., 101"
+                  value={scheduleLessonData.room_number}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, room_number: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="col-span-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Add any notes about the lesson..."
+                  value={scheduleLessonData.description}
+                  onChange={(e) => setScheduleLessonData({ ...scheduleLessonData, description: e.target.value })}
+                  className="mt-1 min-h-[80px]"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowScheduleLessonModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleScheduleLesson}
+              disabled={isScheduling || !scheduleLessonData.student_id}
+              className="bg-gradient-to-r from-green-600 to-blue-600"
+            >
+              {isScheduling ? 'Scheduling...' : 'Schedule Lesson'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={showEditProfileModal} onOpenChange={setShowEditProfileModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5" />
+              Edit Profile
+            </DialogTitle>
+            <DialogDescription>
+              Update your instructor profile information
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={editProfileData.bio}
+                onChange={(e) => setEditProfileData({ ...editProfileData, bio: e.target.value })}
+                placeholder="Tell students about yourself..."
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
+              <Input
+                id="hourly_rate"
+                type="number"
+                value={editProfileData.hourly_rate}
+                onChange={(e) => setEditProfileData({ ...editProfileData, hourly_rate: e.target.value })}
+                placeholder="Your hourly rate"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                value={editProfileData.phone}
+                onChange={(e) => setEditProfileData({ ...editProfileData, phone: e.target.value })}
+                placeholder="Your phone number"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="specializations">Specializations</Label>
+              <Input
+                id="specializations"
+                value={editProfileData.specializations}
+                onChange={(e) => setEditProfileData({ ...editProfileData, specializations: e.target.value })}
+                placeholder="Piano, Guitar, Voice (comma-separated)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditProfileModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveProfile}
+              className="bg-gradient-to-r from-green-600 to-blue-600"
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Lesson Notes Dialog */}
+      <Dialog open={showEditLessonModal} onOpenChange={setShowEditLessonModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5" />
+              Edit Lesson Notes
+            </DialogTitle>
+            <DialogDescription>
+              {editingLesson?.title || 'Lesson'} - {editingLesson?.scheduled_at ?
+                formatDateCST(editingLesson.scheduled_at) :
+                'Not scheduled'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid gap-2">
+              <Label htmlFor="instructor_notes" className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
+                Instructor Notes
+              </Label>
+              <Textarea
+                id="instructor_notes"
+                value={editLessonData.instructor_notes}
+                onChange={(e) => setEditLessonData({ ...editLessonData, instructor_notes: e.target.value })}
+                placeholder="Private notes about this lesson (only visible to you and admins)..."
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="homework_assigned" className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-amber-500 rounded-full"></span>
+                Homework Assigned
+              </Label>
+              <Textarea
+                id="homework_assigned"
+                value={editLessonData.homework_assigned}
+                onChange={(e) => setEditLessonData({ ...editLessonData, homework_assigned: e.target.value })}
+                placeholder="What should the student practice before the next lesson..."
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="progress_notes" className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                Progress Notes
+              </Label>
+              <Textarea
+                id="progress_notes"
+                value={editLessonData.progress_notes}
+                onChange={(e) => setEditLessonData({ ...editLessonData, progress_notes: e.target.value })}
+                placeholder="Track the student's progress and achievements..."
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="general_notes">General Notes</Label>
+              <Textarea
+                id="general_notes"
+                value={editLessonData.notes}
+                onChange={(e) => setEditLessonData({ ...editLessonData, notes: e.target.value })}
+                placeholder="Any other notes about this lesson..."
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditLessonModal(false);
+                setEditingLesson(null);
+              }}
+              disabled={isSavingLesson}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveLessonNotes}
+              disabled={isSavingLesson}
+              className="bg-gradient-to-r from-green-600 to-blue-600"
+            >
+              {isSavingLesson ? 'Saving...' : 'Save Notes'}
             </Button>
           </DialogFooter>
         </DialogContent>

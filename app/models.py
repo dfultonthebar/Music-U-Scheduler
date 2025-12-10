@@ -91,6 +91,9 @@ class Lesson(Base):
     materials_needed = Column(Text, nullable=True)
     homework_assigned = Column(Text, nullable=True)
     progress_notes = Column(Text, nullable=True)
+    actual_start_time = Column(DateTime(timezone=True), nullable=True)  # When instructor clicked "Start Lesson"
+    actual_end_time = Column(DateTime(timezone=True), nullable=True)    # When instructor clicked "End Lesson"
+    actual_duration_minutes = Column(Integer, nullable=True)            # Calculated actual duration
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -199,6 +202,25 @@ class LessonTemplate(Base):
     # Relationships
     instructor = relationship("User", foreign_keys=[instructor_id], backref="template_lessons_taught")
     student = relationship("User", foreign_keys=[student_id], backref="template_lessons_taken")
+
+
+class StudentInstructorAssignment(Base):
+    """Direct student-instructor assignments (independent of lessons)"""
+    __tablename__ = "student_instructor_assignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    instrument = Column(String, nullable=True)  # What instrument for this assignment
+    is_primary = Column(Boolean, default=True)  # Primary instructor for this student
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    student = relationship("User", foreign_keys=[student_id], backref="instructor_assignments")
+    instructor = relationship("User", foreign_keys=[instructor_id], backref="student_assignments")
 
 
 class StudentRegistration(Base):

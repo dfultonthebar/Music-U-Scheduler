@@ -309,21 +309,21 @@ async def cancel_lesson(
     lesson = crud.get_lesson(db, lesson_id)
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
-    
+
     if lesson.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to cancel this lesson")
-    
+
     if lesson.status != models.LessonStatus.SCHEDULED:
         raise HTTPException(status_code=400, detail="Only scheduled lessons can be cancelled")
-    
+
     # Update lesson status and add cancellation note
     lesson_update = schemas.LessonUpdate(
         status=models.LessonStatus.CANCELLED,
         instructor_notes=f"Cancelled by instructor: {cancellation_reason}"
     )
-    
+
     updated_lesson = crud.update_lesson(db, lesson_id, lesson_update, updated_by=current_user.id)
-    
+
     # Log the action
     crud.log_audit_action(
         db, current_user.id, "CANCEL", "lesson", lesson_id,
@@ -331,8 +331,92 @@ async def cancel_lesson(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent")
     )
-    
+
     return {"message": "Lesson cancelled successfully", "lesson": updated_lesson}
+
+
+@router.put("/lessons/{lesson_id}/start", response_model=schemas.Lesson)
+async def start_lesson(
+    lesson_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """Start a lesson - records the actual start time for hour tracking"""
+    lesson = crud.get_lesson(db, lesson_id)
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    if lesson.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to start this lesson")
+
+    if lesson.status != models.LessonStatus.SCHEDULED:
+        raise HTTPException(status_code=400, detail="Only scheduled lessons can be started")
+
+    if lesson.actual_start_time:
+        raise HTTPException(status_code=400, detail="Lesson has already been started")
+
+    # Record the actual start time (using system local time - CST)
+    now = datetime.now()
+    lesson.actual_start_time = now
+    db.commit()
+    db.refresh(lesson)
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "START", "lesson", lesson_id,
+        f"Instructor started lesson: {lesson.title} at {now.strftime('%H:%M:%S')}",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return lesson
+
+
+@router.put("/lessons/{lesson_id}/end", response_model=schemas.Lesson)
+async def end_lesson(
+    lesson_id: int,
+    request: Request,
+    current_user: models.User = Depends(require_teacher_role),
+    db: Session = Depends(get_db)
+):
+    """End a lesson - records the actual end time and calculates duration for hour tracking"""
+    lesson = crud.get_lesson(db, lesson_id)
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    if lesson.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to end this lesson")
+
+    if not lesson.actual_start_time:
+        raise HTTPException(status_code=400, detail="Lesson must be started before it can be ended")
+
+    if lesson.actual_end_time:
+        raise HTTPException(status_code=400, detail="Lesson has already been ended")
+
+    # Record the actual end time and calculate duration (using system local time - CST)
+    now = datetime.now()
+    lesson.actual_end_time = now
+
+    # Calculate actual duration in minutes
+    duration = now - lesson.actual_start_time
+    lesson.actual_duration_minutes = int(duration.total_seconds() / 60)
+
+    # Mark lesson as completed
+    lesson.status = models.LessonStatus.COMPLETED
+
+    db.commit()
+    db.refresh(lesson)
+
+    # Log the action
+    crud.log_audit_action(
+        db, current_user.id, "END", "lesson", lesson_id,
+        f"Instructor ended lesson: {lesson.title} at {now.strftime('%H:%M:%S')}. Actual duration: {lesson.actual_duration_minutes} minutes",
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    return lesson
 
 
 # Student Management
@@ -341,17 +425,28 @@ async def get_instructor_students(
     current_user: models.User = Depends(require_teacher_role),
     db: Session = Depends(get_db)
 ):
-    """Get all students taught by this instructor"""
-    # Get unique student IDs from lessons
-    student_ids = db.query(models.Lesson.student_id).filter(
+    """Get all students assigned to or taught by this instructor"""
+    # Get student IDs from StudentInstructorAssignment table (primary source)
+    assigned_student_ids = db.query(models.StudentInstructorAssignment.student_id).filter(
+        models.StudentInstructorAssignment.instructor_id == current_user.id
+    ).all()
+    assigned_student_ids = [sid[0] for sid in assigned_student_ids]
+
+    # Also get student IDs from lessons (for backwards compatibility)
+    lesson_student_ids = db.query(models.Lesson.student_id).filter(
         models.Lesson.teacher_id == current_user.id
     ).distinct().all()
-    
-    student_ids = [sid[0] for sid in student_ids]
-    
+    lesson_student_ids = [sid[0] for sid in lesson_student_ids]
+
+    # Combine and deduplicate
+    all_student_ids = list(set(assigned_student_ids + lesson_student_ids))
+
+    if not all_student_ids:
+        return []
+
     # Get student details
-    students = db.query(models.User).filter(models.User.id.in_(student_ids)).all()
-    
+    students = db.query(models.User).filter(models.User.id.in_(all_student_ids)).all()
+
     return students
 
 

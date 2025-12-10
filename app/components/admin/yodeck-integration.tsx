@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatDateTimeCST } from '@/lib/timezone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -153,8 +154,7 @@ export default function YodeckIntegration() {
   const formatLastSync = (lastSync: string | null) => {
     if (!lastSync) return 'Never';
     try {
-      const date = new Date(lastSync);
-      return date.toLocaleString();
+      return formatDateTimeCST(lastSync);
     } catch {
       return 'Invalid date';
     }

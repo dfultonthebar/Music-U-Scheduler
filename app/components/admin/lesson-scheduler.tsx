@@ -24,6 +24,7 @@ import {
   Music
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { createCSTDateTime, formatTimeCST, formatDateTimeCST, APP_TIMEZONE } from '@/lib/timezone';
 
 interface Instructor {
   id: number;
@@ -227,7 +228,9 @@ export default function LessonScheduler() {
 
     try {
       setLoading(true);
-      const dateTimeStr = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTime}:00`;
+      // Use CST timezone utility to create the datetime string
+      // This ensures the time is stored as-is without UTC conversion
+      const dateTimeStr = createCSTDateTime(format(selectedDate, 'yyyy-MM-dd'), selectedTime);
 
       const lessonData = {
         title: lessonTitle,
@@ -271,7 +274,7 @@ export default function LessonScheduler() {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card data-testid="lesson-scheduler-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5" />
@@ -292,7 +295,7 @@ export default function LessonScheduler() {
                   Instructor *
                 </Label>
                 <Select onValueChange={handleInstructorChange}>
-                  <SelectTrigger>
+                  <SelectTrigger data-testid="instructor-select">
                     <SelectValue placeholder="Select instructor" />
                   </SelectTrigger>
                   <SelectContent>
@@ -359,7 +362,7 @@ export default function LessonScheduler() {
                       value={selectedStudent?.toString() || ''}
                       onValueChange={(v) => setSelectedStudent(parseInt(v))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger data-testid="student-select">
                         <SelectValue placeholder={
                           showAllStudents
                             ? "Select from all students"
@@ -415,6 +418,7 @@ export default function LessonScheduler() {
                   value={lessonTitle}
                   onChange={(e) => setLessonTitle(e.target.value)}
                   placeholder="e.g., Piano Beginner Lesson"
+                  data-testid="lesson-title-input"
                 />
               </div>
 
@@ -608,6 +612,7 @@ export default function LessonScheduler() {
               onClick={handleScheduleLesson}
               disabled={loading || !validation?.is_valid}
               className="min-w-[200px]"
+              data-testid="schedule-lesson-button"
             >
               {loading ? (
                 <>

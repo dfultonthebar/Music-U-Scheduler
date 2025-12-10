@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatDateTimeCST } from '@/lib/timezone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -193,7 +194,7 @@ export default function SystemBackupManager() {
                       <div className="flex items-center gap-3 text-sm text-gray-500">
                         <span>{formatFileSize(backup.size)}</span>
                         <span>•</span>
-                        <span>{new Date(backup.created_at).toLocaleString()}</span>
+                        <span>{formatDateTimeCST(backup.created_at)}</span>
                         <span>•</span>
                         <Badge variant={backup.type === 'manual' ? 'default' : 'secondary'}>
                           {backup.type}

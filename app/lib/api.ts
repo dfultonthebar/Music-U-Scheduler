@@ -148,6 +148,19 @@ class APIService {
     return this.makeRequest<User>('/auth/me');
   }
 
+  async updateMyProfile(userId: number, data: {
+    full_name?: string;
+    phone?: string;
+    address?: string;
+    emergency_contact?: string;
+    instrument?: string;
+  }): Promise<User> {
+    return this.makeRequest<User>(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async logout(): Promise<void> {
     this.clearToken();
   }
@@ -225,6 +238,51 @@ class APIService {
 
   async getInstructorStudents(): Promise<Student[]> {
     return this.makeRequest<Student[]>('/instructor/students');
+  }
+
+  async createInstructorLesson(lessonData: {
+    title: string;
+    description?: string;
+    teacher_id: number;
+    student_id: number;
+    scheduled_at: string;
+    duration_minutes: number;
+    instrument?: string;
+    lesson_type?: string;
+    location?: string;
+    room_number?: string;
+  }): Promise<Lesson> {
+    return this.makeRequest<Lesson>('/lessons', {
+      method: 'POST',
+      body: JSON.stringify(lessonData),
+    });
+  }
+
+  async updateInstructorLesson(lessonId: number, updateData: {
+    title?: string;
+    description?: string;
+    notes?: string;
+    instructor_notes?: string;
+    homework_assigned?: string;
+    progress_notes?: string;
+    status?: string;
+  }): Promise<Lesson> {
+    return this.makeRequest<Lesson>(`/instructor/lessons/${lessonId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+  }
+
+  async startLesson(lessonId: number): Promise<Lesson> {
+    return this.makeRequest<Lesson>(`/instructor/lessons/${lessonId}/start`, {
+      method: 'PUT',
+    });
+  }
+
+  async endLesson(lessonId: number): Promise<Lesson> {
+    return this.makeRequest<Lesson>(`/instructor/lessons/${lessonId}/end`, {
+      method: 'PUT',
+    });
   }
 
   async getInstructorSchedule(): Promise<any> {
@@ -1196,6 +1254,50 @@ class APIService {
 
   async getYodeckInstructorSlides(): Promise<any[]> {
     return await this.makeRequest('/admin/yodeck/instructors');
+  }
+
+  // Student-Instructor Assignment APIs
+  async getStudentInstructors(studentId: number | string): Promise<any> {
+    return await this.makeRequest(`/admin/students/${studentId}/instructors`);
+  }
+
+  async getInstructorAssignedStudents(instructorId: number | string): Promise<any> {
+    return await this.makeRequest(`/admin/instructors/${instructorId}/assigned-students`);
+  }
+
+  async getAllStudentInstructorAssignments(): Promise<any[]> {
+    return await this.makeRequest('/admin/student-instructor-assignments');
+  }
+
+  async assignStudentToInstructor(data: {
+    student_id: number;
+    instructor_id: number;
+    instrument?: string;
+    is_primary?: boolean;
+    notes?: string;
+  }): Promise<any> {
+    return await this.makeRequest('/admin/student-instructor-assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateStudentInstructorAssignment(assignmentId: number, data: {
+    instrument?: string;
+    is_primary?: boolean;
+    notes?: string;
+    is_active?: boolean;
+  }): Promise<any> {
+    return await this.makeRequest(`/admin/student-instructor-assignments/${assignmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeStudentInstructorAssignment(assignmentId: number): Promise<any> {
+    return await this.makeRequest(`/admin/student-instructor-assignments/${assignmentId}`, {
+      method: 'DELETE',
+    });
   }
 }
 

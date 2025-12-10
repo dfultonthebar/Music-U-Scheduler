@@ -12,32 +12,94 @@ Music U Scheduler is a comprehensive music lesson scheduling application with:
 
 ```
 Music-U-Scheduler/
-├── app/                    # Main application code
-│   ├── api/routers/        # FastAPI route handlers (Python)
-│   │   ├── admin.py        # Admin endpoints (/admin/*)
-│   │   ├── users.py        # User management
-│   │   ├── lessons.py      # Lesson CRUD
-│   │   └── instructor.py   # Instructor endpoints
-│   ├── app/                # Next.js app directory
-│   │   ├── admin/          # Admin dashboard page
-│   │   ├── instructor/     # Instructor dashboard page
-│   │   └── login/          # Login page
-│   ├── components/         # React components
-│   │   ├── admin/          # Admin-specific components
-│   │   ├── auth/           # Authentication components
-│   │   └── ui/             # shadcn/ui component library
-│   ├── lib/                # Frontend utilities
-│   │   ├── api.ts          # API client class
-│   │   └── types.ts        # TypeScript interfaces
-│   ├── contexts/           # React context providers
-│   ├── auth/               # FastAPI auth logic
-│   ├── main.py             # FastAPI app entry point
-│   ├── models.py           # SQLAlchemy models
-│   ├── schemas.py          # Pydantic schemas
-│   └── database.py         # Database connection
-├── music-u-env/            # Python virtual environment
-├── alembic/                # Database migrations
-└── app.db                  # SQLite database file
+├── app/                           # Main application code
+│   ├── api/routers/               # FastAPI route handlers (Python)
+│   │   ├── admin.py               # Admin endpoints (/admin/*)
+│   │   ├── instructor.py          # Instructor endpoints
+│   │   ├── lessons.py             # Lesson CRUD
+│   │   ├── users.py               # User management
+│   │   ├── web_admin.py           # Web admin routes
+│   │   └── web_instructor.py      # Web instructor routes
+│   ├── auth/                      # FastAPI auth logic
+│   │   ├── dependencies.py        # JWT auth dependencies
+│   │   ├── routers.py             # Auth endpoints
+│   │   └── utils.py               # Password/token utilities
+│   ├── services/                  # Backend services
+│   │   ├── email.py               # SMTP email service
+│   │   └── yodeck.py              # Yodeck digital signage
+│   ├── app/                       # Next.js app directory
+│   │   ├── admin/                 # Admin dashboard page
+│   │   ├── api/auth/[...nextauth] # NextAuth API routes
+│   │   ├── dashboard/             # General dashboard
+│   │   ├── forgot-password/       # Password reset request
+│   │   ├── instructor/            # Instructor dashboard
+│   │   ├── login/                 # Login page
+│   │   ├── register/              # Student registration
+│   │   └── reset-password/        # Password reset
+│   ├── components/                # React components
+│   │   ├── admin/                 # Admin components (11 files)
+│   │   │   ├── admin-dashboard.tsx
+│   │   │   ├── data-export.tsx
+│   │   │   ├── email-settings.tsx
+│   │   │   ├── github-updates.tsx
+│   │   │   ├── lesson-scheduler.tsx
+│   │   │   ├── role-management.tsx
+│   │   │   ├── system-backup.tsx
+│   │   │   ├── user-management.tsx
+│   │   │   ├── version-management.tsx
+│   │   │   └── yodeck-integration.tsx
+│   │   ├── auth/                  # Auth components
+│   │   │   ├── forgot-password-form.tsx
+│   │   │   ├── login-form.tsx
+│   │   │   ├── reset-password-form.tsx
+│   │   │   ├── role-selection.tsx
+│   │   │   └── student-registration-form.tsx
+│   │   ├── instructor/            # Instructor components
+│   │   │   ├── availability-manager.tsx
+│   │   │   ├── days-off-manager.tsx
+│   │   │   └── instructor-dashboard.tsx
+│   │   ├── layout/                # Layout components
+│   │   │   └── protected-route.tsx
+│   │   └── ui/                    # shadcn/ui components (40+ files)
+│   ├── contexts/                  # React context providers
+│   │   └── auth-context.tsx
+│   ├── hooks/                     # Custom React hooks
+│   │   ├── use-toast.ts
+│   │   └── useAuth.ts
+│   ├── lib/                       # Frontend utilities
+│   │   ├── api.ts                 # API client class
+│   │   ├── auth.ts                # NextAuth configuration
+│   │   ├── timezone.ts            # CST timezone formatting
+│   │   ├── types.ts               # TypeScript interfaces
+│   │   ├── utils.ts               # Utility functions
+│   │   └── version.ts             # Version info
+│   ├── main.py                    # FastAPI app entry point
+│   ├── models.py                  # SQLAlchemy models
+│   ├── schemas.py                 # Pydantic schemas
+│   ├── crud.py                    # CRUD operations
+│   └── database.py                # Database connection
+├── alembic/                       # Database migrations
+├── scripts/                       # Utility scripts
+│   ├── create_admin.py            # Admin user creation
+│   └── db_init.py                 # Database initialization
+├── tests/                         # Test suite
+│   ├── test_api_*.py              # API tests
+│   ├── test_*_playwright.py       # Playwright UI tests
+│   └── test_comprehensive_*.py    # Full integration tests
+├── uploads/                       # User uploads (profile images)
+├── music-u-env/                   # Python virtual environment
+├── app.db                         # SQLite database file
+├── setup-production.sh            # Production deployment script
+├── start-all.sh                   # Start both services
+├── start-backend.sh               # Start backend only
+├── start-frontend.sh              # Start frontend only
+├── manage-services.sh             # Service management
+├── download-update.sh             # Update from GitHub
+├── clear-sessions.sh              # Clear user sessions
+├── README.md                      # Project readme
+├── CLAUDE.md                      # Technical documentation
+├── CHANGELOG.md                   # Version history
+└── TROUBLESHOOTING.md             # Support guide
 ```
 
 ## Running the Application
